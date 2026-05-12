@@ -1,4 +1,4 @@
-From mathcomp Require Import all_ssreflect ssralg ssrint ssrnum matrix.
+From mathcomp Require Import all_boot all_order ssralg ssrint ssrnum matrix.
 From mathcomp Require Import interval rat.
 From mathcomp Require Import boolp classical_sets functions mathcomp_extra.
 From mathcomp Require Import reals ereal interval_inference.
@@ -21,41 +21,20 @@ Local Open Scope ring_scope.
 Local Open Scope order_scope.
 Local Open Scope ereal_scope.
 
-Definition p_sum_int_fun (a b: \bar R) (n: nat) := match n with
-                                      | 0 => a
-                                      | S 0 => b
-                                      | _ => 0%R%:E
-                                      end.
-
-Definition p_sum_int_fun' (a b: \bar R) (g: bool) := if g then a else b.
-
-Definition p_sum_int_fun'' (a b: {nonneg \bar R}) (n: nat) := if n == 0%N then a else if n == 1%N then b else 0%:E%:nng.
+Definition p_sum_int_fun (a b: {nonneg \bar R}) (n: nat) := if n == 0%N then a else if n == 1%N then b else 0%:E%:nng.
 
 
-Definition p_sum'' (p: \bar R) (a b: {nonneg \bar R}):=
-  'N[counting]_p [(fun n => (p_sum_int_fun'' a b n)%:num)].
+Definition p_sum (p: \bar R) (a b: {nonneg \bar R}):=
+  'N[counting]_p [(fun n => (p_sum_int_fun a b n)%:num)].
 
-Definition p_sum''nng (p: \bar R) (a b: {nonneg \bar R}): {nonneg \bar R}.
+Definition p_sum_nng (p: \bar R) (a b: {nonneg \bar R}): {nonneg \bar R}.
 Proof.
-  exists (p_sum'' p a b).
+  exists (p_sum p a b).
   apply/andP. split.
   - apply/orP. left. by apply Lnorm_ge0.
   - rewrite in_itv /=. apply/andP. split; last done.
     by apply Lnorm_ge0.
 Defined.
-
-Definition neg_p_sum_notNy (p: \bar R)  (a b: {nonneg \bar R}): {nonneg \bar R} :=
-  if (a%:num == 0) || (b%:num == 0) then 0%:E%:nng
-  else if a%:num == +oo then b
-  else if b%:num == +oo then a
-  else p_sum''nng p a b.
-
-Definition p_sum''' (p: \bar R) (a b: {nonneg \bar R}): {nonneg \bar R} :=
-  if (p > (0%R: \bar R)) then
-    p_sum''nng p a b
-  else if (p < (0%R: \bar R)) && (p > (-oo: \bar R)) then
-    neg_p_sum_notNy p a b
-  else mine a b.
 
 Definition invnnge (a: {nonneg \bar R}) := a%:num^-1%:nng.
 
@@ -67,9 +46,9 @@ Definition divnnge (a b: {nonneg \bar R}) := comulnnge (invnnge a) b.
 
 Definition p_sum_de_morgan (p: \bar R) (a b: {nonneg \bar R}): {nonneg \bar R} :=
   if (p > 0%R) then
-    p_sum''nng p a b
+    p_sum_nng p a b
   else if (p < 0%R) then
-    invnnge (p_sum''nng (-p) (invnnge a) (invnnge b))
+    invnnge (p_sum_nng (-p) (invnnge a) (invnnge b))
   else 0%:E%:nng.
 
 End definitions.
@@ -101,26 +80,27 @@ Proof.
 Qed.
 
 Lemma p_sum_spec (p : R) (a b: {nonneg \bar R}):
-  (p != 0%R) -> p_sum'' p%:E a b = ((a%:num `^ p) + (b%:num `^ p)) `^ (1/p).
+  (p != 0%R) -> p_sum p%:E a b = ((a%:num `^ p) + (b%:num `^ p)) `^ (1/p).
 Proof.
-  intros Hp. rewrite /p_sum''.
-  rewrite (Lnorm_generalised_counting p (fun n => (p_sum_int_fun'' a b n)%:num)) //.
+  intros Hp. rewrite /p_sum.
+  rewrite (Lnorm_generalised_counting p (fun n => (p_sum_int_fun a b n)%:num)) //.
   rewrite (nneseries_split _ 2).
   - rewrite eseries0.
     * have ->: (0%nat + 2%nat)%nat = 2%nat by rewrite add0n.
       rewrite addr0 big_ltn // big_ltn //.
       rewrite big_geq //=. rewrite !gee0_abs //.
       by rewrite div1r addr0.
-    * rewrite /p_sum_int_fun'' //=.
+    * rewrite /p_sum_int_fun //=.
       move=> [|[|i]] _ _ //=. rewrite normr0.
       by rewrite powR0 //=. (* x `^ 1 for x < 0 is not defined *)
   - by move=> [|[|k]] _ //=; apply poweR_ge0.
 Qed.
 
-Lemma invnnge_involutive (a: {nonneg \bar R}):
-  a `* `* = a.
+Lemma invnnge_involutive:
+  involutive (@invnnge R).
 Proof.
-  rewrite /invnnge /=. apply/val_inj => /=. by rewrite inveK.
+  rewrite /involutive /cancel /invnnge /= => a.
+  apply/val_inj => /=. by rewrite inveK.
 Qed.
 
 Lemma p_sum_duality (p: \bar R) (a b: {nonneg \bar R}):
@@ -154,7 +134,7 @@ Proof.
 Qed.
 
 (* TODO Remove the "non0" from the name, it's not necessary  *)
-Lemma harmonic_p_sum_fin_non0 (p: R) (a b: {nonneg \bar R}):
+Lemma harmonic_p_sum_fin (p: R) (a b: {nonneg \bar R}):
   (p < 0)%R -> a ⊕[p%:E] b =  ((adde ((a `*)%:num `^ (-p)) ((b `*)%:num `^ (-p))) `^ (1/(-p)))%:nng`*.
 Proof.
   move=> Hp. apply/val_inj. simpl.
@@ -170,7 +150,7 @@ Qed.
 Lemma harmonic_p_sum_1 (a b: {nonneg \bar R}):
   a ⊕[-1] b = (adde a%:num^-1 b%:num^-1)^-1%:nng.
 Proof.
-  rewrite harmonic_p_sum_fin_non0 //=. 
+  rewrite harmonic_p_sum_fin //=. 
   apply/val_inj => /=. rewrite opprK invr1 mulr1.
   by rewrite !poweRe1 //.
 Qed.
@@ -183,7 +163,7 @@ Qed.
    summand is 0, so the case analysis in neg_p_sum_notNy
    is needed *)
 Lemma harmonic_p_sum_incorrect:
-  (@p_sum'' R ((-1)%:E) 0%:E%:nng 1%:E%:nng) = 1%:E.
+  (@p_sum R ((-1)%:E) 0%:E%:nng 1%:E%:nng) = 1%:E.
 Proof.
   rewrite p_sum_spec /=; last done.
   by rewrite powR0 // powR1 add0r mul1r invrN1 powRN powR1 invr1.
@@ -228,9 +208,9 @@ Proof.
   - apply /ess_supP. exists set0. split; try done.
     apply subsetCl. rewrite setC0.
     move=> [|[|k]] _ /=; rewrite num_lee_max; apply /orP.
-    + by left. Search (maxe _ _).
-    + by right.
-    + left. by rewrite Hfinsupp.
+    * by left.
+    * by right.
+    * left. by rewrite Hfinsupp.
   - rewrite /ess_sup /mkset. apply /ereal_infP. move=> y Hyae.
     have Hy: forall x : nat, (f x)%:num <= y by apply ae_counting.
     clear Hyae. rewrite num_gee_max. apply/andP. split.
@@ -253,27 +233,27 @@ Proof.
 Qed.
 
 Lemma p_sum_Lnorm_y (a b: {nonneg \bar R}):
-  p_sum'' +oo a b = maxe a%:num b%:num.
+  p_sum +oo a b = maxe a%:num b%:num.
 Proof.
-  rewrite /p_sum''.
+  rewrite /p_sum.
   rewrite unlock /Lnorm /= counting_nat.
   (* abse is absolute value for extended real *)
   (* \o is function composition *)
   apply le_anti. apply /andP. split.
   - apply /ess_supP. exists set0. split; try done.
     apply subsetCl. rewrite setC0.
-    move=> [|[|_]] _ /=; rewrite /p_sum_int_fun'' ?gee0_abs // num_lee_max; apply /orP.
+    move=> [|[|_]] _ /=; rewrite /p_sum_int_fun ?gee0_abs // num_lee_max; apply /orP.
     * by left.
     * by right.
     * left. rewrite normr0.
       suff H: 0%R <= a%:nngnum by done. (* This surely should not be so complicated... *)
       by apply ge0e.
   - rewrite /ess_sup /mkset. apply /ereal_infP. move=> y Hyae.
-    have Hy: forall x : nat, (abse \o (fun n => (p_sum_int_fun'' a b n)%:num)) x <= y.
+    have Hy: forall x : nat, (abse \o (fun n => (p_sum_int_fun a b n)%:num)) x <= y.
     by apply ae_counting.
     clear Hyae. rewrite num_gee_max. apply/andP. split.
-    * move: Hy=> /(_ 0%N) /=. by rewrite gee0_abs // /p_sum_int_fun''.
-    * move: Hy=> /(_ 1%N) /=. by rewrite gee0_abs // /p_sum_int_fun''. (*copy-paste,bad*)
+    * move: Hy=> /(_ 0%N) /=. by rewrite gee0_abs // /p_sum_int_fun.
+    * move: Hy=> /(_ 1%N) /=. by rewrite gee0_abs // /p_sum_int_fun. (*copy-paste,bad*)
 Qed.
 
 Lemma p_sum_y (a b: {nonneg \bar R}):
@@ -281,7 +261,7 @@ Lemma p_sum_y (a b: {nonneg \bar R}):
 Proof.
   apply/val_inj. simpl.
   rewrite /p_sum_de_morgan maxe_translation.
-  have ->: (0%R < +oo) by done. rewrite /p_sum''nng /=.
+  have ->: (0%R < +oo) by done. rewrite /p_sum_nng /=.
   by apply p_sum_Lnorm_y.
 Qed.
 
@@ -291,7 +271,7 @@ Proof.
   apply/val_inj. simpl. rewrite /p_sum_de_morgan.
   have ->: 0%R < -oo = false by done.
   have ->: -oo < 0%R by done.
-  rewrite /p_sum''nng /=.
+  rewrite /p_sum_nng /=.
   rewrite p_sum_Lnorm_y /= mine_translation /mine /maxe.
   destruct (a%:num < b%:num) eqn:E.
   - suff ->: a%:num^-1 < b%:num^-1 = false by rewrite inveK.
@@ -388,16 +368,19 @@ Lemma lee0P (p: \bar R) : p <= 0 <-> p = -oo \/ exists2 r, (r <= 0)%R & p = r%:E
 Proof.
   split.
   - move=> Hp. rewrite -(oppeK p) oppe_le0 in Hp.
-    move: (gee0P (-p)) => [/(_ Hp) [-Hp'|[r [Hr Hr']]] _].
+    move: (gee0P (-p)) => [/(_ Hp) [-Hp'|[r Hr Hr']] _].
     * left. by have -> /=: p = -(+oo) by rewrite -(oppeK p); f_equal.
     * right. exists (-r)%R; first by rewrite oppr_lte0.
       rewrite -(oppeK p). by rewrite Hr'.
-  - by move=> [->|[r [Hr ->]]].
+  - by move=> [->|[r Hr ->]].
 Qed.
 
 Lemma posP (p: \bar R): 0 < p < +oo -> exists2 r, (0 < r)%R & p = r%:E.
 Proof.
-Admitted.
+  move=> /andP [Hp0 Hpy]. move: (gee0P p) => [/(_ (ltW Hp0)) [Hpy'|[r Hr Hr']] _].
+  - move: Hpy' Hpy. by rewrite ltey => ->.
+  - exists r => //. by rewrite -lte_fin -Hr'.
+Qed.
 
 Lemma adde_p_sum_bounds (a b: \bar R) (p: R):
   0 < a < +oo -> 0 < b < +oo -> 0 < adde (a `^ p) (b `^ p) < +oo.
@@ -424,7 +407,6 @@ Qed.
 Lemma nonneg_not_0 (p q: R):
  (q <= p)%R -> (0 < q)%R -> p != 0%R.
 Proof.
-  Check gt_eqF. Check lt_eqF.
   move=> Hpq Hq.
   suff: (0 < p)%R. by rewrite lt0r; move=> /andP [// _].
   by eapply lt_le_trans; first exact Hq.
@@ -433,7 +415,7 @@ Qed.
 Lemma invp_add_le1 (a b: R):
   (0 < a)%R -> (0 < b)%R -> ((a + b)^-1 * a <= 1)%R.
 Proof.
-  move=> Ha Hb. Search (_^-1 * _)%R.
+  move=> Ha Hb.
   have: (0 < a + b)%R by apply addr_gt0.
   rewrite lt0r=> /andP [Hab _].
   rewrite -(@mulVf _ (a + b)%R) //. apply ltW in Ha, Hb.
@@ -491,7 +473,7 @@ Lemma p_sumC (p: \bar R):
   (0 < p) -> commutative (fun a b => a ⊕[p] b).
 Proof.
   move=> Hp a b. apply/val_inj. simpl.
-  move: (gee0P p) => [/(_ (ltW Hp)) [->|[r [Hr Hr']]] _].
+  move: (gee0P p) => [/(_ (ltW Hp)) [->|[r Hr Hr']] _].
   - by rewrite !p_sum_y comparable_maxC.
   - clear Hr. have Hr: (0 < r)%R by rewrite -lte_fin -Hr'.
     rewrite Hr' !(p_sum_fin _ _ _ Hr). simpl.
@@ -523,7 +505,7 @@ Lemma p_sumA (p: \bar R):
   (0 < p) -> associative (fun a b => a ⊕[p] b).
 Proof.
   move=> Hp a b c. apply/val_inj. simpl.
-  move: (gee0P p) => [/(_ (ltW Hp)) [->|[r [Hr Hr']]] _];
+  move: (gee0P p) => [/(_ (ltW Hp)) [->|[r Hr Hr']] _];
     first by rewrite !p_sum_y comparable_maxA.
   clear Hr. have Hr: (0 < r)%R by rewrite -lte_fin -Hr'.
   rewrite Hr' !(p_sum_fin _ _ _ Hr). apply p_sumA_explicit.
@@ -685,7 +667,7 @@ Lemma lt0r_ler_poweR (r: R) (a b: \bar R): (r <= 0)%R ->
   0 < a < +oo -> 0 < b < +oo -> (a <= b) -> (b `^ r <= a `^ r).
 Proof.
   move=> Hr Ha Hb Hba.
-  move: (posP _ Ha) (posP _ Hb) => [s [Hs Hs']] [t [Ht Ht']].
+  move: (posP _ Ha) (posP _ Hb) => [s Hs Hs'] [t Ht Ht'].
   rewrite Hs' Ht' !poweR_EFin lee_fin lt0_ler_powR //.
   by rewrite -lee_fin -Ht' -Hs'.
 Qed.
@@ -695,7 +677,7 @@ Local Ltac itv_poweR_solve := rewrite in_itv /=; apply/andP; split; first done; 
 Lemma p_sum_left_semiadditive (a b: {nonneg \bar R}) (p: \bar R):
   (0 < p) -> a%:num <= (a ⊕[p] b)%:num.
 Proof.
-  move=> Hp. move: (gee0P p) => [/(_ (ltW Hp)) [->|[r [_ Hr]]] _].
+  move=> Hp. move: (gee0P p) => [/(_ (ltW Hp)) [->|[r _ Hr]] _].
   - rewrite p_sum_y maxe_translation num_lee_max.
     apply/orP. by left.
   - rewrite Hr. rewrite Hr in Hp.
@@ -743,7 +725,7 @@ Lemma p_sum_left_monotone (a a' b: {nonneg \bar R}) (p: \bar R):
   0 < p -> a%:num <= a'%:num -> (a ⊕[p] b)%:num <= (a' ⊕[p] b)%:num.
 Proof.
   move=> Hp Haa'.
-  move: (gee0P p) => [/(_ (ltW Hp)) [->|[r [Hr Hr']]] _].
+  move: (gee0P p) => [/(_ (ltW Hp)) [->|[r Hr Hr']] _].
   - rewrite !p_sum_y !maxe_translation num_gee_max. apply/andP.
     split; rewrite num_lee_max; apply/orP; last by right.
     by left.

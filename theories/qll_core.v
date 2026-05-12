@@ -1,6 +1,6 @@
-From Stdlib Require Import List Permutation.
+From Stdlib Require Import List.
 
-From mathcomp Require Import all_ssreflect ssralg ssrint ssrnum.
+From mathcomp Require Import all_boot all_order ssralg ssrint ssrnum.
 From mathcomp Require Import interval interval_inference rat.
 From mathcomp Require Import reals constructive_ereal classical_sets ereal.
 
@@ -173,11 +173,15 @@ Inductive prv : list (@qll_formula R i atoms) -> list (@qll_formula R i atoms) -
 
 | top_R:                 (* ---------------–----- *)
                                   [] ⊢ [⊤]
-(* Structural permutation rule as Rocq development uses lists instead of multisets *)
-| PERM Γ Γ' Δ Δ': 
-                   Permutation Γ Γ' -> Permutation Δ Δ' ->  Γ ⊢ Δ
+(* Structural exchange rules as Rocq development uses lists instead of multisets *)
+| EXCH_L A B Γ Γ' Δ: 
+                             Γ ++ (A::B::Γ') ⊢ Δ
                          (* ---------------–----- *)
-                       ->          Γ' ⊢ Δ'
+                       ->    Γ ++ (B::A::Γ') ⊢ Δ
+| EXCH_R A B Γ Δ Δ': 
+                             Γ ⊢ Δ ++ (A::B::Δ')
+                         (* ---------------–----- *)
+                       ->    Γ ⊢ Δ ++ (B::A::Δ')
 where "A ⊢ B" := (prv A B): qll_calculus.
 
 Fixpoint validity {Γ} {Δ} (P: Γ ⊢ Δ): {nonneg \bar R} :=
@@ -195,13 +199,14 @@ Fixpoint validity {Γ} {Δ} (P: Γ ⊢ Δ): {nonneg \bar R} :=
   | one_R => 1%:E%:nng
   | neg_L _ _ _ P => validity P
   | neg_R _ _ _ P => validity P
-  | or_L p _ _ _ _ P1 P2 => (validity P1) ⊕[-p%:num] (validity P2) (* TODO Why does p%:num not work. UPDATE: We need to open ring_scope *)
+  | or_L p _ _ _ _ P1 P2 => (validity P1) ⊕[-p%:num] (validity P2) 
   | or_R p _ _ _ _ P1 P2 => (validity P1) ⊕[p%:num] (validity P2)
   | and_L p _ _ _ _ P1 P2 => (validity P1) ⊕[p%:num] (validity P2)
   | and_R p _ _ _ _ P1 P2 => (validity P1) ⊕[-p%:num] (validity P2)
   | bot_L => +oo%:nng
   | top_R => +oo%:nng
-  | PERM _ _ _ _ _ _ P => validity P
+  | EXCH_L _ _ _ _ _ P => validity P
+  | EXCH_R _ _ _ _ _ P => validity P
   end.
 
 Definition provability_set A B := (Itv.r \o validity) @` [set: A ⊢ B].
@@ -220,7 +225,7 @@ Qed.
 End deduction.
 
 Notation "A ⊢ B" := (@prv _ _ _ A B) (at level 61): qll_calculus. 
-Notation "|/ A ⊢- B |/" := (@provability _ _ _ A B) (at level 61): qll_calculus. (* TODO Fix notation trouble  *)
+Notation "|/ A ⊢- B |/" := (@provability _ _ _ A B) (at level 61): qll_calculus. (* TODOFind better notation  *)
 
 
 Section semantics.
@@ -229,6 +234,7 @@ Context {R: realType}.
 Context {i: interval int}.  
 Context {atoms: Type}.
 
+Local Open Scope ring_scope.
 Local Open Scope ereal_scope.
 Local Open Scope nngereal_scope.
 Local Open Scope qll_calculus.
@@ -236,14 +242,14 @@ Local Open Scope qll_calculus.
 Fixpoint eval_form (form: @qll_formula _ i _) (f: atoms -> {nonneg \bar R}) :=
   match form with
   | atom a => f a
-  | neg_atom a => ((f a) `*)%NNGE (* TODO: Is this really the intended semantics? *)
+  | neg_atom a => ((f a) `*)%NNGE
   | 𝟙 => 1%:E%:nng
   | ⊥ => 0%:E%:nng
   | ⊤ => +oo%:nng
   | A ⊗ B => ((eval_form A f) ⊗ (eval_form B f))%NNGE
   | (A ⊗* B) => ((eval_form A f) ⊗* (eval_form B f))%NNGE
-  | A ∧[p] B => (eval_form A f) ⊕[-Itv.r p] (eval_form B f)
-  | A ∨[p] B => (eval_form A f) ⊕[Itv.r p] (eval_form B f)         
+  | A ∧[p] B => (eval_form A f) ⊕[-p%:num] (eval_form B f)
+  | A ∨[p] B => (eval_form A f) ⊕[p%:num] (eval_form B f)         
   end.
                    
 End semantics.
