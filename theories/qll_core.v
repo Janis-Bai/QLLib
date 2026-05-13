@@ -20,13 +20,12 @@ Definition itvnume (R : numDomainType) (i: interval int) & phant R :=
 
 Notation "{ 'itv' \bar R & i }" := (itvnume R i (Phant R)) : qll_calculus.
 
+(** * Mechanisation of Quantitative Linear Logic (QLL) *)
+(** ** Syntax of Formulas *)
 Section syntax.
 
 Open Scope qll_calculus.
 
-(* TODO Update comment Quantifying this type over an interval allows us to prove completeness for the
-   rationals where the and/or connectives are only annotated by 1.
-   For general Capucci Logic, the interval used for i will be `[0,+oo] *) 
 Inductive qll_connective {R: realType} {p: {nonneg \bar R}}: Type :=
 | tensor: qll_connective
 | par: qll_connective
@@ -52,6 +51,8 @@ Notation "⊥" := (@bot _ _ _): qll_calculus.
 Notation "⊤" := (@top _ _ _): qll_calculus.
 Notation "𝟙" := (@one _ _ _): qll_calculus.
 
+(** ** Negation of Formulas *)
+(** Notably, negation is a syntactic transformation of formulas *)
 Section negation.
 
 Local Open Scope ring_scope.
@@ -80,6 +81,7 @@ End negation.
 Notation "A `*" := (neg A): qll_calculus.
 Notation "A --o B" := (@bin _ _ _ par (neg A) B) (at level 45, right associativity): qll_calculus.
 
+(** ** Deduction Rules **)
 Section deduction.
 
 Context {R: realType}.
@@ -184,6 +186,7 @@ Inductive prv : list (@qll_formula R p atoms) -> list (@qll_formula R p atoms) -
                        ->    Γ ⊢ Δ ++ (B::A::Δ')
 where "A ⊢ B" := (prv A B): qll_calculus.
 
+(** ** Validity and Provability of Sequents **)
 Fixpoint validity {Γ} {Δ} (P: Γ ⊢ Δ): {nonneg \bar R} :=
   match P with
   | AX _ => 1%:E%:nng
@@ -227,7 +230,7 @@ End deduction.
 Notation "A ⊢ B" := (@prv _ _ _ A B) (at level 61): qll_calculus. 
 Notation "|/ A ⊢- B |/" := (@provability _ _ _ A B) (at level 61): qll_calculus. (* TODOFind better notation  *)
 
-
+(** ** Semantics: Interpretation of Formulas **)
 Section semantics.
 
 Context {R: realType}.
@@ -256,7 +259,8 @@ End semantics.
 
 Notation "〚 form 〛_ f" := (@eval_form _ _ _ form f) (at level 61): qll_calculus.
 (* TODO get nicer square brackets... *)
-                  
+
+(** ** Towards Completeness of QLL Without Atoms **)
 Section rat_completeness.
 
 Context {R: realType}.
@@ -363,6 +367,8 @@ Proof.
   move=> Ha. by rewrite adde_hack addye.
 Qed.
 
+(** Evaluation of a formula without atoms where all additive connectives
+    are annotated by 1 yields a nonnegative rational number or infinity *)
 Lemma eval_no_atoms_is_rat (f: @qll_formula R 1%:nng False):
   (〚 f 〛_atom_func)%:num = +oo
     \/ exists q: rat, (0 <= q)%R /\

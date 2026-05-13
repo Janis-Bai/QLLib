@@ -9,8 +9,8 @@ From mathcomp Require Import constructive_ereal exp.
 
 Import Order.TTheory GRing.Theory Num.Theory.
 
+(** * Interval Inference Contributions **)
 Section ereal_inv_interval.
-
 Local Open Scope ring_scope.
 Local Open Scope order_scope.
 Local Open Scope ereal_scope.
@@ -19,6 +19,8 @@ Local Open Scope ereal_scope.
   Local Notation ext_num_def := (Itv.def ext_num_sem).
   Local Notation ext_num_spec := (Itv.spec ext_num_sem).
 
+  (** ** Inversion for Extended Reals *)
+  (** If x is comparable to 0, then so is x^-1 *)
   Lemma realIe:
     forall x: \bar R, 0%:E >=< x -> 0%:E >=< x^-1.
   Proof.
@@ -43,11 +45,12 @@ Local Open Scope ereal_scope.
   | BSide _ (Posz _) => +oo%O
   | BInfty _ => +oo%O
   end.
-
+      
   Definition int_inve i :=
   let: Interval l u := i in
   Interval (IntItv.keep_nonneg_bound l) (keep_neg_strict_bound u).
   
+  (** Inference lemma for inversion *)
   Lemma ext_num_spec_div xi (x : ext_num_def xi) (r := Itv.real1 int_inve xi) :
     ext_num_spec r (x%:inum^-1 : \bar R).
   Proof.
@@ -75,6 +78,7 @@ Local Open Scope ereal_scope.
   Canonical inve_inum xi (x : ext_num_def xi) :=
     Itv.mk (ext_num_spec_div _ x).
 
+  (** ** Powers With Real Exponent and Extended Real Base *) 
   Definition poweR_itv i :=
   let: Interval l u := i in
   Interval (IntItv.keep_pos_bound l) +oo%O.

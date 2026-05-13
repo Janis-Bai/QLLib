@@ -12,6 +12,8 @@ From QLLib Require Import interval_einference.
 Import Order.TTheory GRing.Theory Num.Theory.
 
 (* A full line should represent a meaningful reasoning step *)
+(** * Connectives in QLLib and their Properties *)
+(** ** Definitions **)
 Section definitions.
 
 Context {R: realType}.
@@ -22,7 +24,6 @@ Local Open Scope order_scope.
 Local Open Scope ereal_scope.
 
 Definition p_sum_int_fun (a b: {nonneg \bar R}) (n: nat) := if n == 0%N then a else if n == 1%N then b else 0%:E%:nng.
-
 
 Definition p_sum (p: \bar R) (a b: {nonneg \bar R}):=
   'N[counting]_p [(fun n => (p_sum_int_fun a b n)%:num)].
@@ -35,15 +36,19 @@ Proof.
   - rewrite in_itv /=. apply/andP. split; last done.
     by apply Lnorm_ge0.
 Defined.
-
+(** Inversion of nonnegative extended reals *)
 Definition invnnge (a: {nonneg \bar R}) := a%:num^-1%:nng.
 
+(** Multiplication of nonnegative extended reals *)
 Definition mulnnge (a b: {nonneg \bar R}) := (a%:num * b%:num)%:nng.
 
+(** Comultiplication of nonnegative extended reals *)
 Definition comulnnge (a b: {nonneg \bar R}) := invnnge (mulnnge (invnnge a) (invnnge b)).
 
+(** Division of nonnegative extended reals *)
 Definition divnnge (a b: {nonneg \bar R}) := comulnnge (invnnge a) b.
 
+(** p-sums, both for positive p and negative p *)
 Definition p_sum_de_morgan (p: \bar R) (a b: {nonneg \bar R}): {nonneg \bar R} :=
   if (p > 0%R) then
     p_sum_nng p a b
@@ -73,12 +78,13 @@ Local Open Scope order_scope.
 Local Open Scope ereal_scope.
 Local Open Scope nngereal_scope.
 
+(** ** Properties of (harminic) p-sums *)
 Lemma Lnorm_generalised_counting (p : R) (f: (\bar R)^nat):
   (p != 0%R) -> 'N[counting]_p%:E [f] = (\sum_(k <oo) (`| f k | `^ p)) `^ p^-1.
 Proof.
   by move=> p0; rewrite unlock ge0_integral_count// => k; rewrite poweR_ge0.
 Qed.
-
+(** p-sums are defined as certain integrals. This lemma says that p sums are explicitly given by (a^p + b^p) ^ (1/p) *)
 Lemma p_sum_spec (p : R) (a b: {nonneg \bar R}):
   (p != 0%R) -> p_sum p%:E a b = ((a%:num `^ p) + (b%:num `^ p)) `^ (1/p).
 Proof.
@@ -96,6 +102,7 @@ Proof.
   - by move=> [|[|k]] _ //=; apply poweR_ge0.
 Qed.
 
+(** Inversion is involutive *)
 Lemma invnnge_involutive:
   involutive (@invnnge R).
 Proof.
@@ -103,6 +110,7 @@ Proof.
   apply/val_inj => /=. by rewrite inveK.
 Qed.
 
+(** p-sum and harmonic p-sum are dual to each other *)
 Lemma p_sum_duality (p: \bar R) (a b: {nonneg \bar R}):
   p != 0 -> a ⊕[p] b = ((a `*) ⊕[-p] (b `*)) `*.
 Proof.
@@ -126,6 +134,7 @@ Proof.
   by move: Hp => /andP [// _].
 Qed.
 
+(** 1-sum is just addition *)
 Lemma p_sum_1 (a b: {nonneg \bar R}):
   a ⊕[1] b = (adde a%:num b%:num)%:nng.
 Proof.
@@ -133,7 +142,6 @@ Proof.
   by rewrite invr1 mul1r !poweRe1 //.
 Qed.
 
-(* TODO Remove the "non0" from the name, it's not necessary  *)
 Lemma harmonic_p_sum_fin (p: R) (a b: {nonneg \bar R}):
   (p < 0)%R -> a ⊕[p%:E] b =  ((adde ((a `*)%:num `^ (-p)) ((b `*)%:num `^ (-p))) `^ (1/(-p)))%:nng`*.
 Proof.
@@ -169,6 +177,7 @@ Proof.
   by rewrite powR0 // powR1 add0r mul1r invrN1 powRN powR1 invr1.
 Qed.
 
+(** The only null set wrt the counting measure is the empty set *)
 Lemma counting_zero:
   forall (S: set nat), @counting _ R S = 0 -> S = set0.
 Proof.
@@ -180,6 +189,7 @@ Proof.
   - by apply /eqP.
 Qed.
 
+(** A property holding ae wrt the counting measure holds universally *)
 Lemma ae_counting (P: nat -> bool):
   (\forall x \ae (@counting _ R), P x) <-> forall x, P x.
 Proof.
@@ -200,6 +210,7 @@ Proof.
   by have /asboolF -> //: ~finite_set [set: nat] by apply infinite_nat.
 Qed.
 
+(** Technical utility lemmas *)
 Lemma ess_sup_bin_fun  (f: ({nonneg \bar R})^nat):
   (forall n, (2 <= n)%N -> f n = 0%:E%:nng) -> (forall n, 0 <= (f n)%:num)
   -> ess_sup counting (fun n => (f n)%:num) = maxe (f 0%N)%:num (f 1%N)%:num.
@@ -256,6 +267,7 @@ Proof.
     * move: Hy=> /(_ 1%N) /=. by rewrite gee0_abs // /p_sum_int_fun. (*copy-paste,bad*)
 Qed.
 
+(** oo-sum is just binary maximum *)
 Lemma p_sum_y (a b: {nonneg \bar R}):
   a ⊕[+oo] b = (maxe a b).
 Proof.
@@ -265,6 +277,7 @@ Proof.
   by apply p_sum_Lnorm_y.
 Qed.
 
+(** harmonic oo-sum is just binary minimum *)
 Lemma harmonic_p_sum_Ny (a b: {nonneg \bar R}):
   a ⊕[-oo] b = (mine a b).
 Proof.
@@ -287,6 +300,7 @@ Proof.
       by rewrite inveK.
 Qed.
 
+(** More technical utility lemmas *)
 Lemma nng_in_itv (a: \bar R):  Itv.spec ext_num_sem (Itv.Real `[0%Z, +oo[) a -> 0 <= a.
 Proof.
   rewrite /ext_num_sem /Itv.spec. move=> /andP. rewrite in_itv /=.
@@ -423,6 +437,8 @@ Proof.
   by rewrite invr_ge0 addr_ge0.
 Qed.
 
+(** Power function for real exponent greater equal 1 is subadditive
+    Should be added to exp.v *)
 Lemma ge1_poweR_subadditive (a b: {nonneg \bar R}) (p: R):
   (1 <= p)%R -> a%:num `^ p + b%:num `^ p <= (a%:num + b%:num) `^ p.
 Proof.
@@ -468,7 +484,8 @@ Proof.
       + by rewrite invp_add_le1.
       + by rewrite addrC invp_add_le1.
 Qed.
-       
+
+(** p-sum and harmonic p-sum are commutative *)
 Lemma p_sumC (p: \bar R):
   (0 < p) -> commutative (fun a b => a ⊕[p] b).
 Proof.
@@ -501,6 +518,7 @@ Proof.
   by rewrite addeA.
 Qed.
 
+(** p-sum and harmonic p-sum are associative *)
 Lemma p_sumA (p: \bar R):
   (0 < p) -> associative (fun a b => a ⊕[p] b).
 Proof.
@@ -523,8 +541,8 @@ Proof.
   by rewrite invnnge_involutive p_sumA // oppe_gt0.
 Qed.  
     
-(** Automation to solve x <= +oo would be nice *)
-
+(* Automation to solve x <= +oo would be nice *)
+(** ** Interplay of the connectives *)
 Lemma mul_comul_ineq (a b : {nonneg \bar R}): (a ⊗ b)%:num <= (a ⊗* b)%:num.
 Proof.
   move: (nng_0posy a) (nng_0posy b) => /= [->|[->|[r Hr ->]]] [->|[->|[s Hs ->]]].
@@ -576,9 +594,9 @@ Proof.
     by rewrite ltNye.
 Qed.
   
-
+ 
 Lemma mul_comul_equiv (a b c : {nonneg \bar R}):
-  ((a ⊗ b)%:num <= c`*%:num) <-> (a%:num <= (b ⊗ c)`*%:num). (* Should we use = instead *)
+  ((a ⊗ b)%:num <= c`*%:num) <-> (a%:num <= (b ⊗ c)`*%:num). (* Should we use = instead? *)
 Proof.
   split.
   - move: (nng_0pos a) => /= [->|Ha] Hineq; first by rewrite inve_ge0.
@@ -671,7 +689,7 @@ Proof.
   rewrite Hs' Ht' !poweR_EFin lee_fin lt0_ler_powR //.
   by rewrite -lee_fin -Ht' -Hs'.
 Qed.
-
+(** ** Inequalities Concerning p-sums *)
 Local Ltac itv_poweR_solve := rewrite in_itv /=; apply/andP; split; first done; rewrite leey.
 
 Lemma p_sum_left_semiadditive (a b: {nonneg \bar R}) (p: \bar R):
