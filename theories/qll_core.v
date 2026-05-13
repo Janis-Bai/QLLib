@@ -24,30 +24,30 @@ Section syntax.
 
 Open Scope qll_calculus.
 
-(* Quantifying this type over an interval allows us to prove completeness for the
+(* TODO Update comment Quantifying this type over an interval allows us to prove completeness for the
    rationals where the and/or connectives are only annotated by 1.
    For general Capucci Logic, the interval used for i will be `[0,+oo] *) 
-Inductive qll_connective {R: realType} {i: interval int}: Type :=
+Inductive qll_connective {R: realType} {p: {nonneg \bar R}}: Type :=
 | tensor: qll_connective
 | par: qll_connective
-| add_and: {itv \bar R & i} -> qll_connective
-| add_or: {itv \bar R & i} -> qll_connective.
+| add_and: qll_connective
+| add_or: qll_connective.
 
-Inductive qll_formula {R: realType} {i: interval int} {atoms: Type}: Type :=
+Inductive qll_formula {R: realType} {p: {nonneg \bar R}} {atoms: Type}: Type :=
 | atom: atoms -> qll_formula
 | neg_atom: atoms -> qll_formula
 | one: qll_formula
 | bot: qll_formula
 | top: qll_formula
-| bin: @qll_connective R i -> qll_formula -> qll_formula -> qll_formula.
+| bin: @qll_connective R p -> qll_formula -> qll_formula -> qll_formula.
 
 End syntax.
 
 (* TODO: Discuss notation levels and make them appropriate *)
 Notation "A ⊗ B" := (@bin _ _ _ tensor A B) (at level 46, left associativity): qll_calculus.
 Notation "A ⊗* B" := (@bin _ _ _ par A B) (at level 46, left associativity): qll_calculus.
-Notation "A ∧[ p ] B" := (@bin _ _ _ (add_and p) A B) (at level 47, left associativity): qll_calculus.
-Notation "A ∨[ p ] B" := (@bin _ _ _ (add_or p) A B) (at level 48, left associativity): qll_calculus.
+Notation "A ∧[ p ] B" := (@bin _ p _ add_and A B) (at level 47, left associativity): qll_calculus.
+Notation "A ∨[ p ] B" := (@bin _ p _ add_or A B) (at level 48, left associativity): qll_calculus.
 Notation "⊥" := (@bot _ _ _): qll_calculus.
 Notation "⊤" := (@top _ _ _): qll_calculus.
 Notation "𝟙" := (@one _ _ _): qll_calculus.
@@ -59,10 +59,10 @@ Local Open Scope ereal_scope.
 Local Open Scope qll_calculus.
 
 Context {R: realType}.
-Context {i: interval int}.
+Context {p: {nonneg \bar R}}.
 Context {atoms: Type}.
 
-Fixpoint neg (form: @qll_formula R i atoms): qll_formula := match form with
+Fixpoint neg (form: @qll_formula R p atoms): qll_formula := match form with
 | atom a => neg_atom a
 | neg_atom a => atom a
 | 𝟙 => 𝟙
@@ -70,8 +70,8 @@ Fixpoint neg (form: @qll_formula R i atoms): qll_formula := match form with
 | ⊤ => ⊥
 | A ⊗ B => (neg A) ⊗* (neg B)
 | (A ⊗* B) => (neg A) ⊗ (neg B)
-| A ∧[p] B => (neg A) ∨[p] (neg B)
-| A ∨[p] B => (neg A) ∧[p] (neg B)                                                        end.
+| A ∧[_] B => (neg A) ∨[p] (neg B)
+| A ∨[_] B => (neg A) ∧[p] (neg B)                                                        end.
 
 Compute (neg (⊥ ⊗* (⊥ ⊗ 𝟙))).
 
@@ -83,7 +83,7 @@ Notation "A --o B" := (@bin _ _ _ par (neg A) B) (at level 45, right associativi
 Section deduction.
 
 Context {R: realType}.
-Context {i: interval int}.  
+Context {p: {nonneg \bar R}}.  
 Context {atoms: Type}.
 
 Local Open Scope ring_scope.
@@ -101,7 +101,7 @@ Reserved Notation "A ⊢ B" (at level 61).
    otherwise prevent us from computing the (numeric hence computational) 
    validity of a given deriviation *)
 (* TODO Maybe make formula and list arguments in the constructors implicit? *)
-Inductive prv : list (@qll_formula R i atoms) -> list (@qll_formula R i atoms) -> Type :=
+Inductive prv : list (@qll_formula R p atoms) -> list (@qll_formula R p atoms) -> Type :=
 | AX A:                  (* ---------------–----- *)
                                   [A] ⊢ [A]
 
@@ -151,19 +151,19 @@ Inductive prv : list (@qll_formula R i atoms) -> list (@qll_formula R i atoms) -
                          (* ---------------–----- *)
                        ->        Γ ⊢ A`*::Δ
 (* Additive Rules *)
-| or_L p A B Γ Δ:
+| or_L A B Γ Δ:
                             A::Γ ⊢ Δ -> B::Γ ⊢ Δ
                          (* ---------------–----- *)
                        ->     A ∨[p] B::Γ ⊢ Δ
-| or_R p A B Γ Δ:
+| or_R A B Γ Δ:
                             Γ ⊢ A::Δ -> Γ ⊢ B::Δ
                          (* ---------------–----- *)
                        ->     Γ ⊢ A ∨[p] B::Δ
-| and_L p A B Γ Δ:
+| and_L A B Γ Δ:
                             A::Γ ⊢ Δ -> B::Γ ⊢ Δ
                          (* ---------------–----- *)
                        ->     A ∧[p] B::Γ ⊢ Δ
-| and_R p A B Γ Δ:
+| and_R A B Γ Δ:
                             Γ ⊢ A::Δ -> Γ ⊢ B::Δ
                          (* ---------------–----- *)
                        ->     Γ ⊢ A ∧[p] B::Δ
@@ -199,10 +199,10 @@ Fixpoint validity {Γ} {Δ} (P: Γ ⊢ Δ): {nonneg \bar R} :=
   | one_R => 1%:E%:nng
   | neg_L _ _ _ P => validity P
   | neg_R _ _ _ P => validity P
-  | or_L p _ _ _ _ P1 P2 => (validity P1) ⊕[-p%:num] (validity P2) 
-  | or_R p _ _ _ _ P1 P2 => (validity P1) ⊕[p%:num] (validity P2)
-  | and_L p _ _ _ _ P1 P2 => (validity P1) ⊕[p%:num] (validity P2)
-  | and_R p _ _ _ _ P1 P2 => (validity P1) ⊕[-p%:num] (validity P2)
+  | or_L _ _ _ _ P1 P2 => (validity P1) ⊕[-p%:num] (validity P2) 
+  | or_R _ _ _ _ P1 P2 => (validity P1) ⊕[p%:num] (validity P2)
+  | and_L _ _ _ _ P1 P2 => (validity P1) ⊕[p%:num] (validity P2)
+  | and_R _ _ _ _ P1 P2 => (validity P1) ⊕[-p%:num] (validity P2)
   | bot_L => +oo%:nng
   | top_R => +oo%:nng
   | EXCH_L _ _ _ _ _ P => validity P
@@ -231,7 +231,7 @@ Notation "|/ A ⊢- B |/" := (@provability _ _ _ A B) (at level 61): qll_calculu
 Section semantics.
 
 Context {R: realType}.
-Context {i: interval int}.  
+Context {p: {nonneg \bar R}}.  
 Context {atoms: Type}.
 
 Local Open Scope ring_scope.
@@ -239,7 +239,7 @@ Local Open Scope ereal_scope.
 Local Open Scope nngereal_scope.
 Local Open Scope qll_calculus.
 
-Fixpoint eval_form (form: @qll_formula _ i _) (f: atoms -> {nonneg \bar R}) :=
+Fixpoint eval_form (form: @qll_formula _ p _) (f: atoms -> {nonneg \bar R}) :=
   match form with
   | atom a => f a
   | neg_atom a => ((f a) `*)%NNGE
@@ -248,8 +248,8 @@ Fixpoint eval_form (form: @qll_formula _ i _) (f: atoms -> {nonneg \bar R}) :=
   | ⊤ => +oo%:nng
   | A ⊗ B => ((eval_form A f) ⊗ (eval_form B f))%NNGE
   | (A ⊗* B) => ((eval_form A f) ⊗* (eval_form B f))%NNGE
-  | A ∧[p] B => (eval_form A f) ⊕[-p%:num] (eval_form B f)
-  | A ∨[p] B => (eval_form A f) ⊕[p%:num] (eval_form B f)         
+  | A ∧[_] B => (eval_form A f) ⊕[-p%:num] (eval_form B f)
+  | A ∨[_] B => (eval_form A f) ⊕[p%:num] (eval_form B f)         
   end.
                    
 End semantics.
@@ -278,7 +278,7 @@ Proof.
   by rewrite Hcon' in Hnlt0.
 Qed.
 
-Check lt_neqAle. Check eqVneq.
+(* Check lt_neqAle. Check eqVneq. *)
 Lemma ge0_neq0_gt0r (r: R):
   (0 <= r)%R -> r != 0%R -> (0 < r)%R.
 Proof.
@@ -299,7 +299,7 @@ Qed.
 Definition False_ind' (T: Type) (x: False): T := match x with end.
 Definition atom_func := False_ind' ({nonneg \bar R}).
 
-Lemma mulye_eval_form {i} (f: @qll_formula _ i _) q:
+Lemma mulye_eval_form {p} (f: @qll_formula _ p _) q:
   (0 <= q)%R  -> (ratr q)%:E = (〚 f 〛_ atom_func)%:num
     -> (+oo * (〚 f 〛_ atom_func)%:num = +oo) \/
      (exists p : rat, (0 <= p)%R /\
@@ -311,7 +311,7 @@ Proof.
     by rewrite (ge0_not_gt0_eq0 q) // ratr_nat mule0.
 Qed.
 
-Lemma addye_eval_form {i} (f: @qll_formula _ i _) q:
+Lemma addye_eval_form {p} (f: @qll_formula _ p _) q:
   (0 <= q)%R  -> (ratr q)%:E = (〚 f 〛_ atom_func)%:num
     -> ((adde +oo^-1 (〚 f 〛_ atom_func)%:num^-1)^-1 = +oo) \/
      (exists p : rat, (0 <= p)%R /\
@@ -341,24 +341,12 @@ Proof.
   - by rewrite unitfE lt0r_neq0 // addr_gt0 // invr_gt0 lt0r;
       apply /andP; split.
 Qed.
-  
 
-(* In the remaining proofs of this section, we want the annotations of
-   ∧ and ∨ to be 1. Achived by forcing the annotations to be in the interval
-   [1,1] = {1}. *)
-Definition itv_1 := `[1%Z,1%Z].
-
-(* TODO How to make this proof short and concise? *)
-Lemma in_itv_1_then_eq_1 (x: {itv \bar R & itv_1}):
-  x%:num = 1.
-Proof.
-  destruct x as [r Hr]. simpl.
-  rewrite /Itv.spec /ext_num_sem in Hr.
-  move: Hr => /andP /=. rewrite in_itv /=.
-  move=> [_ ] Hsandwich.
-  symmetry. by apply le_anti. 
-Qed.
-
+(* some lemmas about adde. This is a workaround, as the underlying properties are proved
+   in MathComp-analysis using the "+"-notation instead of adde, and somehow if
+   the goal contains is adde a b, one cannot use addeC to rewrite to adde b a.
+   We use adde instead of "+" as interval inference does not work property
+   with "+", only with adde *) 
 Lemma adde_hack (a b: \bar R):
   adde a b = a + b.
 Proof. by []. Qed.
@@ -375,12 +363,12 @@ Proof.
   move=> Ha. by rewrite adde_hack addye.
 Qed.
 
-Lemma eval_no_atoms_is_rat (f: @qll_formula R itv_1 False):
+Lemma eval_no_atoms_is_rat (f: @qll_formula R 1%:nng False):
   (〚 f 〛_atom_func)%:num = +oo
     \/ exists q: rat, (0 <= q)%R /\
       (ratr q)%:E = (〚 f 〛_atom_func)%:num.
 Proof.
-  induction f as [a|a| | | |[| |r|r] f1 [IHf1|[p [Hp Hp']]] f2 [IHf2|[q [Hq Hq']]]] => /=.
+  induction f as [a|a| | | |[| | | ] f1 [IHf1|[p [Hp Hp']]] f2 [IHf2|[q [Hq Hq']]]] => /=.
   - by exfalso.
   - by exfalso.
   - right. exists 1%:R. split => //. by rewrite ratr_nat.
@@ -418,14 +406,14 @@ Proof.
             by apply/eqP; move=> H'; apply H; rewrite H'.
           by apply lt0r_neq0, mulr_gt0; rewrite invr_gt0;
             apply ge0_neq0_gt0r => //; rewrite ler0q.
-  - left. rewrite in_itv_1_then_eq_1 harmonic_p_sum_1 /= IHf1 IHf2.
+  - left. rewrite harmonic_p_sum_1 /= IHf1 IHf2.
     rewrite invey adde_hack.
     by rewrite adde0 inve0. 
-  - rewrite in_itv_1_then_eq_1 harmonic_p_sum_1 /= IHf1. 
+  - rewrite harmonic_p_sum_1 /= IHf1. 
     by apply (addye_eval_form _ q).
-  - rewrite in_itv_1_then_eq_1 harmonic_p_sum_1 /= IHf2 addeC_hack.
+  - rewrite  harmonic_p_sum_1 /= IHf2 addeC_hack.
     by apply (addye_eval_form _ p).
-  - rewrite in_itv_1_then_eq_1 harmonic_p_sum_1 /= -Hp' -Hq'. right.
+  - rewrite  harmonic_p_sum_1 /= -Hp' -Hq'. right.
     have [->|Hp0] := eqVneq (ratr p)%:E (0%R: \bar R).
     * rewrite inve0 addye_hack ?inve_eqNy;
         last by rewrite -ltNye ltNyr.
@@ -438,21 +426,21 @@ Proof.
         -- by rewrite invr_ge0 addr_ge0 // invr_ge0.
         -- by apply ratr_add_inv_switch => //; apply/eqP => H;
              [move: Hp0|move: Hq0]; rewrite H rmorph0 eqxx.
-  - rewrite in_itv_1_then_eq_1 p_sum_1 /= IHf1 IHf2. by left.
-  - rewrite in_itv_1_then_eq_1 p_sum_1 /= IHf1. left.
+  - rewrite p_sum_1 /= IHf1 IHf2. by left.
+  - rewrite p_sum_1 /= IHf1. left.
     by rewrite addye_hack //= -ltNye -Hq' ltNyr.
-  - rewrite in_itv_1_then_eq_1 p_sum_1 /= IHf2. left.
+  - rewrite  p_sum_1 /= IHf2. left.
     by rewrite addeC_hack addye_hack //= -ltNye -Hp' ltNyr.
-  - rewrite in_itv_1_then_eq_1 p_sum_1 /=. right.
+  - rewrite  p_sum_1 /=. right.
     exists (p + q)%R. split; first by apply addr_ge0.
     rewrite adde_hack -Hp' -Hq'  -(opprK q%R) ratr_is_additive. (* Ugly workaround *)
     by rewrite rmorphN /= !opprK.
 Qed.
 
-Lemma eval_le_valid (f: @qll_formula R itv_1 False):
+Lemma eval_le_valid (f: @qll_formula R 1%:nng False):
   exists P: [] ⊢ [f], (〚 f 〛_atom_func)%:num <= (validity P)%:num.
 Proof.
-  induction f as [a|a| | | |[| |r|r] f1 [P1 IH1] f2 [P2 IH2]].
+  induction f as [a|a| | | |[| | | ] f1 [P1 IH1] f2 [P2 IH2]].
   - by exfalso.
   - by exfalso.
   - by exists one_R.
@@ -464,17 +452,17 @@ Proof.
     exists P => /=. rewrite lee_pV2; try by rewrite /in_mem /=. 
      by apply (@lee_pmul _ _ _ (validity P2)%:num^-1 _) => //;
        rewrite lee_pV2 //; rewrite /in_mem /=.
-  - exists (and_R r f1 f2 [] [] P1 P2) => /=. 
-    rewrite in_itv_1_then_eq_1 !harmonic_p_sum_1 /=.
+  - exists (and_R f1 f2 [] [] P1 P2) => /=. 
+    rewrite !harmonic_p_sum_1 /=.
     rewrite lee_pV2; try by rewrite /in_mem /=. 
     by apply (@leeD _ (validity P1)%:num^-1 _ _ _); (* Same, just applying diverges *)
       rewrite lee_pV2; try rewrite /in_mem /=. 
-  - exists (or_R r f1 f2 [] [] P1 P2) => /=. 
-    rewrite in_itv_1_then_eq_1 !p_sum_1 /=.
+  - exists (or_R f1 f2 [] [] P1 P2) => /=. 
+    rewrite !p_sum_1 /=.
     by apply (@leeD _ _ _ _ (validity P2)%:num).
 Qed.
 
-Corollary complete_for_rat (f: @qll_formula R itv_1 False):
+Corollary complete_for_rat (f: @qll_formula R 1%:nng False):
   (〚 f 〛_atom_func)%:num <= |/ [] ⊢- [f] |/.
 Proof.
   destruct (eval_le_valid f) as [P HP].
