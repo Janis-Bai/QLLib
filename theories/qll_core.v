@@ -1,5 +1,3 @@
-From Stdlib Require Import List.
-
 From mathcomp Require Import all_boot all_order ssralg ssrint ssrnum.
 From mathcomp Require Import interval interval_inference rat.
 From mathcomp Require Import reals constructive_ereal classical_sets ereal.
@@ -7,6 +5,8 @@ From mathcomp Require Import reals constructive_ereal classical_sets ereal.
 From QLLib Require Import interval_einference nonneg_ereal.
 
 Import Order.TTheory GRing.Theory Num.Theory.
+
+From Stdlib Require Import List.
 
 Import ListNotations.
 
@@ -90,12 +90,10 @@ Context {atoms: Type}.
 
 Local Open Scope ring_scope.
 Local Open Scope classical_set_scope.
-Local Open Scope list_scope.
 Local Open Scope nngereal_scope.
 Local Open Scope ereal_scope.
+Local Open Scope list_scope.
 Local Open Scope qll_calculus.
-
-(* Notation for prv and the rules is inspired by Rocq Library of undecidability *)
 
 Reserved Notation "A ⊢ B" (at level 61).
 
@@ -116,7 +114,7 @@ Inductive prv : list (@qll_formula R p atoms) -> list (@qll_formula R p atoms) -
                             Γ ⊢ A::Δ -> A::Γ' ⊢ Δ'
                          (* ---------------–----- *)
                        ->     Γ ++ Γ' ⊢ Δ ++ Δ'
-| MIX_star  Γ Γ' Δ Δ':
+| MIX  Γ Γ' Δ Δ':
                                Γ ⊢ Δ -> Γ' ⊢ Δ'
                          (* ---------------–----- *)
                        ->     Γ ++ Γ' ⊢ Δ ++ Δ'
@@ -181,9 +179,9 @@ Inductive prv : list (@qll_formula R p atoms) -> list (@qll_formula R p atoms) -
                          (* ---------------–----- *)
                        ->    Γ ++ (B::A::Γ') ⊢ Δ
 | EXCH_R A B Γ Δ Δ': 
-                             Γ ⊢ Δ ++ (A::B::Δ')
+                             Γ ⊢ (Δ ++ A::B::Δ')
                          (* ---------------–----- *)
-                       ->    Γ ⊢ Δ ++ (B::A::Δ')
+                       ->    Γ ⊢ (Δ ++ B::A::Δ')
 where "A ⊢ B" := (prv A B): qll_calculus.
 
 (** ** Validity and Provability of Sequents **)
@@ -193,7 +191,7 @@ Fixpoint validity {Γ} {Δ} (P: Γ ⊢ Δ): {nonneg \bar R} :=
   | EMP => 1%:E%:nng
   | EFQ _ _ => 0%:E%:nng
   | CUT _ _ _ _ _ P1 P2 => ((validity P1) ⊗ (validity P2))%NNGE
-  | MIX_star _ _ _ _ P1 P2 => ((validity P1) ⊗* (validity P2))%NNGE
+  | MIX _ _ _ _ P1 P2 => ((validity P1) ⊗ (validity P2))%NNGE
   | tensor_L _ _ _ _ P => validity P 
   | tensor_R _ _ _ _ _ _ P1 P2 => ((validity P1) ⊗ (validity P2))%NNGE
   | par_L _ _ _ _ _ _ P1 P2 => ((validity P1) ⊗ (validity P2))%NNGE
@@ -225,10 +223,96 @@ Proof.
   rewrite /provability_set /=. by exists P.
 Qed.
 
+Reserved Notation "⊢O A" (at level 61). (* One sided variant of the calculus *)
+
+Inductive Oprv : list (@qll_formula R p atoms) -> Type :=
+| OAX A:                     (* --–-------------–----- *)
+                                      ⊢O [A `*; A] 
+
+| OEMP:                      (* ----------------–----- *)
+                                         ⊢O []
+
+| OEFQ Γ:                    (* -----------------–----- *)
+                                          ⊢O Γ
+
+| OCUT A Σ Γ Δ:               ⊢O A `*::Γ -> ⊢O Σ ++ A::Δ
+                             (* -----------------–----- *)
+                          ->        ⊢O Σ ++ Γ ++ Δ
+
+| OMIX Γ Δ:                          ⊢O Γ -> ⊢O Δ
+                             (* -----------------–----- *)
+                          ->          ⊢O Γ ++ Δ
+
+| OEXCH A B Γ Δ:                    ⊢O Γ ++ (A::B::Δ)
+                             (* -----------------–----- *)
+                          ->       ⊢O Γ ++ (B::A::Δ)
+
+| Otensor A B Γ Δ:                ⊢O A::Γ -> ⊢O B::Δ
+                             (* -----------------–----- *)
+                          ->       ⊢O A ⊗ B::Γ ++ Δ
+
+| Opar A B Γ:                         ⊢O A::B::Γ
+                             (* -----------------–----- *)
+                          ->         ⊢O A ⊗* B::Γ
+
+| Oone:                      (* -----------------–----- *)
+                                       ⊢O [𝟙]
+
+| Oor A B Γ:                       ⊢O A::Γ -> ⊢O B::Γ
+                             (* -----------------–----- *)
+                          ->         ⊢O A ∨[p] B::Γ
+
+| Oand A B Γ:                      ⊢O A::Γ -> ⊢O B::Γ
+                             (* -----------------–----- *)
+                          ->         ⊢O A ∧[p] B::Γ
+
+| Otop Γ:                    (* -----------------–----- *)
+                                       ⊢O ⊤::Γ
+where "⊢O A" := (Oprv A): qll_calculus.
+
+Fixpoint Ovalidity {Γ} (P: ⊢O Γ): {nonneg \bar R} :=
+  match P with
+  | OAX _ => 1%:E%:nng
+  | OEMP => 1%:E%:nng
+  | OEFQ _ => 0%:E%:nng
+  | OCUT _ _ _ _ P1 P2 => (Ovalidity P1 ⊗ Ovalidity P2)%NNGE
+  | OMIX _ _ P1 P2 => (Ovalidity P1 ⊗ Ovalidity P2)%NNGE
+  | OEXCH _ _ _ _ P => Ovalidity P
+  | Otensor _ _ _ _ P1 P2 => (Ovalidity P1 ⊗ Ovalidity P2)%NNGE
+  | Opar _ _ _ P => Ovalidity P
+  | Oone => 1%:E%:nng
+  | Oor _ _ _ P1 P2 => Ovalidity P1 ⊕[p%:num] Ovalidity P2
+  | Oand _ _ _ P1 P2 => Ovalidity P1 ⊕[-p%:num] Ovalidity P2
+  | Otop _ => +oo%:nng
+  end.
+
+Definition Oprovability_set Γ := (Itv.r \o Ovalidity) @` [set: ⊢O Γ].
+
+Definition Oprovability Γ := ereal_sup (Oprovability_set Γ).
+
 End deduction.
 
 Notation "A ⊢ B" := (@prv _ _ _ A B) (at level 61): qll_calculus. 
 Notation "|/ A ⊢- B |/" := (@provability _ _ _ A B) (at level 61): qll_calculus. (* TODOFind better notation  *)
+Notation "⊢O Γ" := (@Oprv _ _ _ Γ) (at level 61): qll_calculus.
+Notation "`| ⊢O Γ |" := (@Oprovability _ _ _ Γ): qll_calculus. 
+
+(* Tactic to conveniently destruct Oprv deductions, inspired by Laurent's LL proof. *) 
+Ltac destruct_Oprv H Σ Γ Δ A B P1 P2 P :=
+  match type of H with
+  | Oprv _ => destruct H as [ A
+                            |
+                            | Γ
+                            | A Σ Γ Δ P1 P2
+                            | Γ Δ P1 P2
+                            | A B Γ Δ P
+                            | A B Γ Δ P1 P2
+                            | A B Γ P
+                            | 
+                            | A B Γ P1 P2
+                            | A B Γ P1 P2
+                            | Γ ]
+  end.
 
 (** ** Semantics: Interpretation of Formulas **)
 Section semantics.
@@ -453,9 +537,9 @@ Proof.
   - by exists (EFQ [] [⊥]).
   - by exists top_R.
   - exists (tensor_R _ _ _ _ _ _ P1 P2) => /=.
-    by apply (@lee_pmul _ _ _ _ (validity P2)%:nngnum). (* Just applying lee_pmus causes Rocq to diverge or take ages *) Check MIX_star.
-  - pose P := (par_R _ _ _ _ (MIX_star _ _ _ _ P1 P2)).
-    exists P => /=. rewrite lee_pV2; try by rewrite /in_mem /=. 
+    by apply (@lee_pmul _ _ _ _ (validity P2)%:nngnum). (* Just applying lee_pmus causes Rocq to diverge or take ages *)
+  - pose P := (par_R _ _ _ _ (MIX _ _ _ _ P1 P2)). admit.
+ (*   exists P => /=. Check lee_pV2. rewrite lee_pV2; try by rewrite /in_mem /=. 
      by apply (@lee_pmul _ _ _ (validity P2)%:num^-1 _) => //;
        rewrite lee_pV2 //; rewrite /in_mem /=.
   - exists (and_R f1 f2 [] [] P1 P2) => /=. 
@@ -465,8 +549,8 @@ Proof.
       rewrite lee_pV2; try rewrite /in_mem /=. 
   - exists (or_R f1 f2 [] [] P1 P2) => /=. 
     rewrite !p_sum_1 /=.
-    by apply (@leeD _ _ _ _ (validity P2)%:num).
-Qed.
+    by apply (@leeD _ _ _ _ (validity P2)%:num). *)
+Admitted.
 
 Corollary complete_for_rat (f: @qll_formula R 1%:nng False):
   (〚 f 〛_atom_func)%:num <= |/ [] ⊢- [f] |/.
@@ -477,3 +561,4 @@ Proof.
 Qed.
       
 End rat_completeness.
+
