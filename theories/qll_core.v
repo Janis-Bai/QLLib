@@ -74,6 +74,13 @@ Fixpoint neg (form: @qll_formula R p atoms): qll_formula := match form with
 | A ∧[_] B => (neg A) ∨[p] (neg B)
 | A ∨[_] B => (neg A) ∧[p] (neg B)                                                        end.
 
+Lemma neg_involutive form:
+  form = neg (neg form).
+Proof.
+  by induction form as [a | a | | | | [| | |] A IHA B IHB] => //=;
+  cbn; rewrite -IHA -IHB.
+Qed.
+
 Compute (neg (⊥ ⊗* (⊥ ⊗ 𝟙))).
 
 End negation.

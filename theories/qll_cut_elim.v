@@ -5,6 +5,8 @@ From mathcomp Require Import reals constructive_ereal classical_sets ereal zify.
 
 From QLLib Require Import qll_core wf_rec nonneg_ereal List_more.
 
+Import Order.TTheory.
+
 (* From OLlibs Require Import List_more. If imported, it changes assumptions in a way that goals become unprovable.  *)
 (* From Yalla.OLlibs Require Import List_more. Cannot import. Error: It makes inconsisten assumptions over PeanoNat *)
 
@@ -57,6 +59,12 @@ Fixpoint fm_rank (form: @qll_formula R p atoms) := match form with
   | A ⊗ B | (A ⊗* B) | A ∧[_] B | A ∨[_] B => fm_rank A + fm_rank B + 1
   end.
 
+Lemma rank_neg_invariant A:
+  fm_rank A = fm_rank A`*.
+Proof.
+  by induction A as [a | a | | | | [| | |] A IHA B IHB] => //=; rewrite IHA IHB.
+Qed.
+
 Fixpoint pf_size {Γ: list (@qll_formula R p atoms)} (P: ⊢O Γ) := match P with
   | OAX _ => 1
   | OEMP => 1
@@ -93,36 +101,8 @@ Open Scope ereal_scope.
 Lemma cat_cons_eq_cat_cat X (Γ Σ: list X) A:
   (Γ ++ A::Σ = (Γ ++ [A]) ++ Σ)%SEQ.
 Proof.
-Admitted.
-
-Lemma list_exch_l (Γ Σ Δ: list (@qll_formula R p atoms)) A:
-  forall P: ⊢O Σ ++ A::Γ ++ Δ, exists Q: ⊢O Σ ++ Γ ++ A::Δ,
-    Ovalidity P = Ovalidity Q /\ (cut_free P -> cut_free Q).
-Proof.
-  induction Γ as [| B Γ IHΓ] in Σ |-*; simpl.
-  - move => P. by exists P.
-  - move => P. rewrite cat_cons_eq_cat_cat.
-    pose P' := (OEXCH _ _ _ _ P).
-    have HPval: Ovalidity P = Ovalidity P' by done.
-    have HPcut: cut_free P -> cut_free P' by done.
-    move: P' HPval HPcut. rewrite cat_cons_eq_cat_cat => P' HPval HPcut.
-    destruct (IHΓ _ P') as [Q [HQval HQcut]].  exists Q. split.
-    + by rewrite HPval.
-    + by move => /HPcut.
-Qed.
-
-Lemma list_exch_r (Γ Σ Δ: list (@qll_formula R p atoms)) A:
-  forall P: ⊢O Σ ++ Γ ++ A::Δ, exists Q: ⊢O Σ ++ A::Γ ++ Δ,
-    Ovalidity P = Ovalidity Q /\ (cut_free P -> cut_free Q).
-Proof.
-  induction Γ as [| B Γ IHΓ] in Σ |-*; simpl.
-  - move => P. by exists P.
-  - move => P. suff [Q [HQval HQcut]]: exists Q: ⊢O Σ ++ B::A::(Γ ++ Δ),
-      Ovalidity P = Ovalidity Q /\ (cut_free P -> cut_free Q)
-      by exists (OEXCH _ _ _ _ Q).
-   rewrite cat_cons_eq_cat_cat.
-   move: P. rewrite cat_cons_eq_cat_cat => P. 
-   by apply IHΓ.
+  induction Γ as [|B Γ IHΓ]; simpl; first done.
+  by rewrite IHΓ.
 Qed.
 
 Lemma cat_cons_cat_lift X (Γ Σ Δ: list X) A:
@@ -139,14 +119,70 @@ Proof.
   cbn. by rewrite IHΓ.
 Qed.
 
+Lemma list_form_exch_l {Γ Σ Δ: list (@qll_formula R p atoms)} {A}:
+  forall P: ⊢O Σ ++ A::Γ ++ Δ, exists Q: ⊢O Σ ++ Γ ++ A::Δ,
+    Ovalidity P = Ovalidity Q /\ (cut_free P -> cut_free Q).
+Proof.
+  induction Γ as [| B Γ IHΓ] in Σ |-*; simpl.
+  - move => P. by exists P.
+  - move => P. rewrite cat_cons_eq_cat_cat.
+    pose P' := (OEXCH _ _ _ _ P).
+    have HPval: Ovalidity P = Ovalidity P' by done.
+    have HPcut: cut_free P -> cut_free P' by done.
+    move: P' HPval HPcut. rewrite cat_cons_eq_cat_cat => P' HPval HPcut.
+    destruct (IHΓ _ P') as [Q [HQval HQcut]].  exists Q. split.
+    + by rewrite HPval.
+    + by move => /HPcut.
+Qed.
+
+Lemma list_form_exch_r {Γ Σ Δ: list (@qll_formula R p atoms)} {A}:
+  forall P: ⊢O Σ ++ Γ ++ A::Δ, exists Q: ⊢O Σ ++ A::Γ ++ Δ,
+    Ovalidity P = Ovalidity Q /\ (cut_free P -> cut_free Q).
+Proof.
+  induction Γ as [| B Γ IHΓ] in Σ |-*; simpl.
+  - move => P. by exists P.
+  - move => P. suff [Q [HQval HQcut]]: exists Q: ⊢O Σ ++ B::A::(Γ ++ Δ),
+      Ovalidity P = Ovalidity Q /\ (cut_free P -> cut_free Q)
+      by exists (OEXCH _ _ _ _ Q).
+   rewrite cat_cons_eq_cat_cat.
+   move: P. rewrite cat_cons_eq_cat_cat => P. 
+   by apply IHΓ.
+Qed.
+
+Lemma list_list_exch {Σ Γ Γ' Δ: list (@qll_formula R p atoms)}:
+  forall P: ⊢O Σ ++ Γ ++ Γ' ++ Δ, exists Q: ⊢O Σ ++ Γ' ++ Γ ++ Δ,
+    Ovalidity P = Ovalidity Q /\ (cut_free P -> cut_free Q).
+Proof.
+  induction Γ as [|A Γ IHΓ] in Γ' |-*; simpl; move => P; first by exists P.
+  destruct (list_form_exch_l P) as [Q1 [HQ1val HQ1cut]]. 
+  move: Q1 HQ1val HQ1cut. rewrite cat_cons_cat_lift -catA => Q1 HQ1val HQ1cut.
+  destruct (IHΓ _ Q1) as [Q2 [HQ2val HQ2cut]].
+  destruct (list_form_exch_l Q2) as [Q3 [HQ3val HQ3cut]].
+  exists Q3. split; first by rewrite HQ1val HQ2val.
+  by move => /HQ1cut /HQ2cut /=.
+Qed.
+
 Lemma exch_inv X (Γ Δ Γ' Δ': list X) (A B C: X):
   Γ ++ A::Δ = Γ' ++ B::C::Δ' ->
   {Σ & (Γ = Γ' ++ B::C::Σ /\ Δ' = Σ ++ A::Δ)%SEQ}
   + {Σ & (Δ = Σ ++ B::C::Δ' /\ Γ' = Γ ++ A::Σ)%SEQ}
-  + {Σ & (Γ = Σ ++ [B] /\ A = C /\ Δ = Δ')%SEQ}
+  + (Γ = Γ' ++ [B] /\ A = C /\ Δ = Δ')%SEQ
   + (Δ = C::Δ' /\ A = B /\ Γ = Γ')%SEQ.
 Proof.
-Admitted.
+  induction Γ as [|D Γ IHΓ] in Γ' |-*;
+  destruct Γ' as [| E Γ']; simpl; move => Heq.
+  - right. inversion Heq. by repeat split => //.
+  - left. left. right. inversion Heq. by exists Γ'.
+  - inversion Heq; subst. destruct Γ as [| D Γ].
+    + inversion H1; subst. left. by right.
+    + inversion H1; subst. repeat left. by exists Γ.
+  - inversion Heq; subst. 
+    destruct (IHΓ _ H1) as [[[[Σ [H2 H3]]|[Σ [H2 H3]]]|[H2 [H3 H4]]]|[H2 [H3 H4]]]; clear IHΓ.
+    + repeat left. exists Σ. split => //. by f_equal.
+    + left. left. right. exists Σ. split => //. by f_equal.
+    + left. right. subst. done.
+    + right. subst. done.
+Qed.
 
 #[local] Ltac exch_inv_exec_core H p :=
   match type of H with
@@ -163,7 +199,63 @@ Tactic Notation "exch_inv_tac" hyp(H) :=
   let H1 := fresh H in
   let H2 := fresh H in
   let H3 := fresh H in
-  exch_inv_exec_core H ipattern:([[[[Σ [H1 H2]]|[Σ [H1 H2]]]|[Σ [H1 [H2 H3]]]]|[H1 [H2 H3]]]).
+  exch_inv_exec_core H ipattern:([[[[Σ [H1 H2]]|[Σ [H1 H2]]]|[H1 [H2 H3]]]|[H1 [H2 H3]]]).
+
+Definition IH_form_rk (rk: nat) := forall Σ Γ Δ A (P1: ⊢O A `*::Γ) (P2: ⊢O Σ ++ A::Δ),
+   (fm_rank A < rk)%coq_nat ->
+   cut_free P1 -> cut_free P2 ->
+   exists Q:  ⊢O Σ ++ Γ ++ Δ, cut_free Q /\
+   ((Ovalidity P1 ⊗ Ovalidity P2)%NNGE%:num <= (Ovalidity Q)%:num)%O.
+
+Definition IH_proof_sz (sz rk: nat) := forall Σ Γ Δ A (P1: ⊢O A `*::Γ) (P2: ⊢O Σ ++ A::Δ),
+   (pf_size P1 + pf_size P2 < sz)%coq_nat ->
+   (fm_rank A <= rk)%coq_nat ->
+   cut_free P1 -> cut_free P2 ->
+   exists Q:  ⊢O Σ ++ Γ ++ Δ, cut_free Q /\
+   ((Ovalidity P1 ⊗ Ovalidity P2)%NNGE%:num <= (Ovalidity Q)%:num)%O.
+
+(* We need rk as parameter here:
+were we to instantiate IH_proof_sz with (fm_rank A) instead of rk
+this lemma would still be provable (with the same proof), but using it in
+the cut admissibility lemma below would require lots of boilerplate proof script *) 
+Lemma cut_adm_exch_case {Σ Γ Γ' Δ Δ' A B C} sz rk: 
+  (IH_proof_sz sz rk) -> (Σ ++ A::Δ = Γ' ++ C::B::Δ')%SEQ ->
+    forall (P1: ⊢O A `*::Γ) (P2: ⊢O Γ' ++ B::C::Δ'),
+    cut_free P1 -> cut_free P2 ->
+    (pf_size P1 + pf_size P2 < sz)%coq_nat -> (fm_rank A <= rk)%coq_nat ->
+    exists Q: ⊢O Σ ++ Γ ++ Δ, cut_free Q /\ 
+    ((Ovalidity P1 ⊗ Ovalidity (OEXCH _ _ _ _ P2))%NNGE <= Ovalidity Q)%O.
+Proof.
+  rewrite /IH_proof_sz => IHsz Heq P1 P2 Hcf1 Hcf2 Hsz Hrk /=.
+  exch_inv_tac Heq; subst.
+  - move: P2 Hcf2 IHsz Hsz => /=. rewrite cat_two_cons_cat_lift => P2 Hcf2 IHsz Hsz.
+      specialize (IHsz _ _ _ _ P1 P2).
+      destruct IHsz as [Q [Hcf HQval]] => //.
+      revert Q Hcf HQval. rewrite -catA => Q Hcf HQval. rewrite -catA.
+      by exists (OEXCH _ _ _ _ Q).
+  - move: P2 Hcf2 IHsz Hsz => /=. rewrite -cat_cons_cat_lift => P2 Hcf2 IHsz Hsz.
+      specialize (IHsz _ _ _ _ P1 P2).
+      destruct IHsz as [Q [Hcf HQval]] => //.
+      revert Q Hcf HQval. rewrite !catA => Q Hcf HQval. 
+      by exists (OEXCH _ _ _ _ Q).
+  - rewrite -cat_cons_eq_cat_cat.
+      suff [Q [HQcut HQval]]: exists Q: ⊢O Γ' ++ Γ ++ C::Δ', cut_free Q /\
+              (Ovalidity P1 ⊗ Ovalidity P2)%NNGE%:num <= (Ovalidity Q)%:num.
+        destruct (list_form_exch_r Q) as [Q' [HQ'val HQ'cut]].
+        exists Q' => /=. split; first by apply HQ'cut.
+        by rewrite -HQ'val.
+      destruct (IHsz _ _ _ _ P1 P2) as [Q [HQcut HQval]] => //=.
+      by exists Q.
+  - suff [Q [HQcut HQval]]: exists Q: ⊢O Γ' ++ B :: Γ ++ Δ', cut_free Q /\
+              (Ovalidity P1 ⊗ Ovalidity P2)%NNGE%:num <= (Ovalidity Q)%:num.
+        destruct (list_form_exch_l Q) as [Q' [HQ'val HQ'cut]].
+        exists Q' => /=. split; first by apply HQ'cut.
+        by rewrite -HQ'val.
+      move: P2 Hcf2 IHsz Hsz => /=. rewrite cat_cons_eq_cat_cat.
+      move => P2 Hcf2 IHsz Hsz.
+      destruct (IHsz _ _ _ _ P1 P2) as [Q [HQcut HQval]] => //.
+      rewrite cat_cons_eq_cat_cat. by exists Q.
+Qed.
 
 Lemma cut_admissibility {Σ Γ Δ: list (@qll_formula R p atoms)} A:
   forall P1: ⊢O A `*::Γ, forall P2: ⊢O Σ ++ A::Δ, cut_free P1 -> cut_free P2 ->
@@ -173,20 +265,24 @@ Proof.
     first by (move=> P1 P2; apply (H (fm_rank A) (pf_size P1 + pf_size P2)%N) => //).
   clear Σ Γ Δ A.
   induction rk as [rk IHrk0] using lt_wf_rect. 
-
-  have IHrk: forall Σ Γ Δ A (P1: ⊢O A `*::Γ) (P2: ⊢O Σ ++ A::Δ), (fm_rank A < rk)%coq_nat -> cut_free P1 -> cut_free P2 -> exists Q:  ⊢O Σ ++ Γ ++ Δ, cut_free Q /\ ((Ovalidity P1 ⊗ Ovalidity P2)%NNGE%:num <= (Ovalidity Q)%:num)%O.
+  have IHrk: IH_form_rk rk. 
     by move => Σ Γ Δ A P1 P2 Hrk; apply (IHrk0 (fm_rank A) Hrk (pf_size P1 + pf_size P2)%N) => //.
-  clear IHrk0.
+  rewrite /IH_form_rk in IHrk.  clear IHrk0.
+  
   induction sz as [sz IHsz0] using lt_wf_rect.
-  have IHsz: forall Σ Γ Δ A (P1: ⊢O A `*::Γ) (P2: ⊢O Σ ++ A::Δ), (pf_size P1 + pf_size P2 < sz)%coq_nat -> (fm_rank A <= rk)%coq_nat -> cut_free P1 -> cut_free P2 -> exists Q:  ⊢O Σ ++ Γ ++ Δ, cut_free Q /\ ((Ovalidity P1 ⊗ Ovalidity P2)%NNGE%:num <= (Ovalidity Q)%:num)%O.
+  have IHsz: IH_proof_sz sz rk.
     by move => Σ Γ Δ A P1 P2 Hsz Hrk; apply (IHsz0 (pf_size P1 + pf_size P2)%N) => //.
-  clear IHsz0.
+  rewrite /IH_proof_sz in IHsz. clear IHsz0.
   move => Σ Γ Δ A P1 P2 Hrk Heqsz Hcf1 Hcf2. subst sz.
   
   remember (Σ ++ A :: Δ)%SEQ as ΣAΔ. destruct_Oprv P2 Σ' Γ' Δ' B C P2_1 P2_2 P2.
   - (* OAX *)
     destruct Σ as [| x Σ]; inversion HeqΣAΔ; subst.
-    + admit.
+    + rewrite /= mule1. 
+      move: P1 Hcf1 IHsz. rewrite -(neg_involutive B) => P1 Hcf1 IHsz. (* Workaround *)
+      specialize (@list_form_exch_l Γ [] [] B) as HQ. rewrite cats0 /= in HQ. 
+      destruct (HQ P1) as [Q [HQval HQcf]]. exists Q. split; first by apply HQcf.
+      rewrite HQval. by apply lexx.
     + symmetry in H1. apply elt_eq_unit in H1 as [Hn [Hm Hk]]. rewrite -Hn Hm Hk.
       rewrite cats0. simpl. exists P1. split => //. by rewrite mule1.
   - (* OEMP *)
@@ -209,30 +305,53 @@ Proof.
       rewrite (@muleC _ (Ovalidity P2_1)%:num (Ovalidity Q)%:num).
       eapply (@lee_pmul _ ((Ovalidity P1)%:num * ((Ovalidity P2_2)%:num))) => //.
   - (* OEXCH *)
+    eapply (cut_adm_exch_case (pf_size P1 + (pf_size P2 + 1)) rk) => //. 
+    by lia.
     (* Set Ltac Debug. *)
-    exch_inv_tac HeqΣAΔ; subst.
-    + move: P2 Hcf2 IHsz => /=. rewrite cat_two_cons_cat_lift => P2 Hcf2 IHsz.
-      specialize (IHsz _ _ _ _ P1 P2).
-      destruct IHsz as [Q [Hcf HQval]] => //; first by lia.
-      revert Q Hcf HQval. rewrite -catA => Q Hcf HQval. rewrite -catA.
-      by exists (OEXCH _ _ _ _ Q).
-    + move: P2 Hcf2 IHsz => /=. rewrite -cat_cons_cat_lift => P2 Hcf2 IHsz.
-      specialize (IHsz _ _ _ _ P1 P2).
-      destruct IHsz as [Q [Hcf HQval]] => //; first by lia.
-      revert Q Hcf HQval. rewrite !catA => Q Hcf HQval. 
-      by exists (OEXCH _ _ _ _ Q).
-    + 
-    + suff [Q [HQcut HQval]]: exists Q: ⊢O Γ' ++ B :: Γ ++ Δ', cut_free Q /\
-              (Ovalidity P1 ⊗ Ovalidity P2)%NNGE%:num <= (Ovalidity Q)%:num.
-        destruct (list_exch _ _ _ _ Q) as [Q' [HQ'val HQ'cut]].
-        exists Q' => /=. split; first by apply HQ'cut.
-        by rewrite -HQ'val.
-      move: P2 Hcf2 IHsz => /=. rewrite cat_cons_eq_cat_cat.
-      move => P2 Hcf2 IHsz.
-      destruct (IHsz _ _ _ _ P1 P2) as [Q [HQcut HQval]] => //; first by lia.
-      rewrite cat_cons_eq_cat_cat. by exists Q.
-
-  
+   - (* Otensor *)
+     destruct Σ as [| D Σ]; inversion HeqΣAΔ; subst.
+     + remember ((B ⊗ C) `* :: Γ)%SEQ as BCΓ. destruct_Oprv P1 Σ Σ' Δ D E P1_1 P1_2 P1; try inversion HeqBCΓ.
+       * destruct Γ as [|E Γ]; inversion H1; subst. simpl.
+         have H': E = B ⊗ C by rewrite (neg_involutive E) (neg_involutive (B ⊗ C)) H0.
+         subst. exists (Otensor _ _ _ _ P2_1 P2_2). split => //.
+         rewrite mul1e. by apply lexx.
+       * admit.
+       * admit.
+       * admit.
+       * simpl in IHsz. simpl. pose P2 := (Otensor _ _ _ _ P2_1 P2_2).
+         have H: (pf_size P2_1 + pf_size P2_2 + 1)%N = pf_size P2 by done.  
+         rewrite H -addnA -(addnC _ 1%N) addnA in IHsz. clear H.
+         have Hcf2': cut_free P2 by done; clear Hcf2.
+         have ->: (Ovalidity P2_1)%:num * (Ovalidity P2_2)%:num = (Ovalidity P2)%:num
+           by done.
+         move: P2 IHsz Hcf2'. rewrite (neg_involutive (B ⊗ C)) => P2 IHsz Hcf2'.
+         rewrite muleC -(cats0 (Γ ++ Γ' ++ Δ')) -catA -catA. (* Workaround, -(cats0 Δ') fails to rewrite *)
+         symmetry in HeqBCΓ. rewrite -(@cat0s _ ((B ⊗ C) `* :: Γ)) in HeqBCΓ.
+         destruct (cut_adm_exch_case (pf_size P1 + pf_size P2 + 1) rk IHsz HeqBCΓ P2 P1) as [Q [HQcut HQval]] => //;
+           [by lia | by rewrite -rank_neg_invariant |].
+         rewrite catA catA -(catA Γ Γ' Δ') -catA -(cat0s (Γ ++ (Γ' ++ Δ') ++ [])).
+         move: Q HQcut HQval. rewrite -(cats0 ([] ++ (Γ' ++ Δ') ++ Γ)) -catA -catA => Q HQcut HQval.
+         destruct (list_list_exch Q) as [Q' [HQ'val HQ'cut]].
+         exists Q'. split; first by apply HQ'cut. by rewrite -HQ'val.
+       * simpl in *. inversion HeqBCΓ. subst. move: P2_1 P2_2 Hcf2 IHsz.
+         rewrite -(cat0s (B::Γ')) -(cat0s (C::Δ')) => P2_1 P2_2 Hcf2 IHzs.
+         destruct Hcf2 as [Hcf2_1 Hcf2_2].
+         destruct (IHrk _ _ _ _ P1 P2_1) as [Q1 [HQ1cut HQ1val]]  => //; first by lia.
+         move: Q1 HQ1cut HQ1val. rewrite catA -cat_cons_cat_lift cat0s => Q1 HQ1cut HQ1val. 
+         destruct (IHrk _ _ _ _ Q1 P2_2) as [Q2 [HQ2cut HQ2val]] => //; first by lia.
+         rewrite catA -(cat0s ((Γ ++ Γ') ++ Δ')). exists Q2. split => //.
+         eapply le_trans; last exact HQ2val. rewrite muleA.
+         by apply: (lee_pmul _ _ HQ1val _) => //.
+     + dichot_elt_app_inf_exec H1; subst; destruct Hcf2 as [Hcf2_1 Hcf2_2] => /=.
+       * destruct (IHsz (B::Σ) _ _ _ P1 P2_1) as [Q [HQcut HQval]] => //=; first by lia.
+         rewrite catA catA -(catA Σ). 
+         exists (Otensor _ _ (Σ ++ Γ ++ Σ0) _ Q P2_2). split => //=.
+         rewrite muleA. by apply: (lee_pmul _ _ HQval _).
+       * destruct (IHsz (C::Σ0) _ _ _ P1 P2_2) as [Q [HQcut HQval]] => //=; first by lia.
+         rewrite -catA. exists (Otensor _ _ _ (Σ0 ++ Γ ++ Δ) P2_1 Q).
+         split => //=. rewrite (muleC (Ovalidity P2_1)%:num _) muleA.
+         rewrite (muleC _ (Ovalidity Q)%:num). by apply: (lee_pmul _ _ HQval _).
+Admitted.
 End cut_elim.
 
 
