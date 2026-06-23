@@ -201,6 +201,19 @@ Tactic Notation "exch_inv_tac" hyp(H) :=
   let H3 := fresh H in
   exch_inv_exec_core H ipattern:([[[[Σ [H1 H2]]|[Σ [H1 H2]]]|[H1 [H2 H3]]]|[H1 [H2 H3]]]).
 
+
+Lemma cat_cons_inv {X} (Σ Γ Δ: list X) A:
+  Σ ++ Δ = A::Γ -> {Σ' & (A::Σ' = Σ)%SEQ} + (Σ = [] /\ Δ = A::Γ).
+Proof.
+Admitted.
+
+Lemma list_elem_list_emp_inv {X} (Σ Γ: list X) A:
+  [] = (Σ ++ A :: Γ) -> False.
+Proof.
+  move => H.
+  by induction Σ; inversion H.
+Qed.
+
 Definition IH_form_rk (rk: nat) := forall Σ Γ Δ A (P1: ⊢O A `*::Γ) (P2: ⊢O Σ ++ A::Δ),
    (fm_rank A < rk)%coq_nat ->
    cut_free P1 -> cut_free P2 ->
@@ -257,11 +270,96 @@ Proof.
       rewrite cat_cons_eq_cat_cat. by exists Q.
 Qed.
 
+Lemma cut_adm_exch_switch_case {Σ Γ Γ' Δ C D E} sz rk:
+  (IH_proof_sz sz rk) -> (Σ ++ E::D::Δ = C `* :: Γ)%SEQ ->
+    forall P1: ⊢O Σ ++ (D::E::Δ), forall P2: ⊢O C :: Γ',
+    cut_free P1 -> cut_free P2 ->
+    (pf_size P1 + pf_size P2 < sz)%coq_nat -> (fm_rank C <= rk)%coq_nat ->
+    exists Q : ⊢O Γ ++ Γ', cut_free Q /\
+    (Ovalidity P1)%:nngnum * (Ovalidity P2)%:nngnum <= (Ovalidity Q)%:nngnum.
+Proof.
+  rewrite /IH_proof_sz => IHsz Heq P1 P2 Hcf1 Hcf2 Hsz Hrk /=.
+  move: P2 IHsz Hcf2 Hsz. rewrite (neg_involutive C) => P2 IHsz Hcf2 Hsz.
+  rewrite muleC -(cats0 (_ ++ _)) -catA. (* Workaround, -(cats0 Δ') fails to rewrite *)
+  symmetry in Heq. rewrite -(@cat0s _ (C `* :: Γ)) in Heq.
+  destruct (cut_adm_exch_case sz rk IHsz Heq P2 P1) as [Q [HQcut HQval]] => //;
+    [by lia | by rewrite -rank_neg_invariant |].
+  rewrite -(cat0s (_ ++ _ ++ _)). 
+  move: Q HQcut HQval. rewrite -(cats0 (_ ++ _ ++ _)) -catA -catA => Q HQcut HQval.     
+  destruct (list_list_exch Q) as [Q' [HQ'val HQ'cut]].
+  exists Q'. split; first by apply HQ'cut. by rewrite -HQ'val.
+Qed.
+
+Lemma cut_adm_mix_case {Σ Γ Δ Σ' Γ' A} sz rk:
+  (IH_proof_sz sz rk) -> (Σ' ++ Γ')%SEQ = (Σ ++ A :: Δ)%SEQ ->
+    forall P1: ⊢O A`* :: Γ, forall P2_1: ⊢O Σ', forall P2_2: ⊢O Γ',
+    cut_free P1 -> cut_free P2_1 -> cut_free P2_2 ->
+    (fm_rank A <= rk)%coq_nat -> 
+    (pf_size P1 + pf_size P2_1 + pf_size P2_2 < sz)%coq_nat ->
+    exists Q: ⊢O Σ ++ Γ ++ Δ, cut_free Q /\
+    ((Ovalidity P1 ⊗ Ovalidity (OMIX _ _ P2_1 P2_2))%NNGE)%:num <= (Ovalidity Q)%:num.
+Proof.
+  rewrite /IH_proof_sz => IHsz Heq P1 P2_1 P2_2 Hcf1 Hcf2_1 Hcf2_2 Hsz Hrk /=.
+  dichot_elt_app_inf_exec Heq; subst. 
+  - specialize (IHsz Σ Γ Σ0 A P1 P2_1).
+    destruct IHsz as [Q [Hcf HQval]] => //=; first by lia.
+    rewrite catA catA -(catA Σ _ _). exists (OMIX _ _ Q P2_2).
+    repeat split => //=. rewrite muleA.
+    by apply: lee_pmul.
+  - specialize (IHsz Σ0 Γ Δ A P1 P2_2).
+    destruct IHsz as [Q [Hcf HQval]] => //=; first by lia.
+    rewrite -catA. exists (OMIX _ _ P2_1 Q). repeat split => //=.
+    rewrite (@muleC _ (Ovalidity P2_1)%:num (Ovalidity P2_2)%:num) muleA.
+    rewrite (@muleC _ (Ovalidity P2_1)%:num (Ovalidity Q)%:num).
+    by apply: lee_pmul.
+Qed.
+
+Lemma cut_adm_mix_switch_case {Γ Δ Σ' Γ' A} sz rk:
+  IH_proof_sz sz rk -> (Σ' ++ Γ')%SEQ = (A`*::Γ)%SEQ ->
+    forall P1_1: ⊢O Σ', forall P1_2: ⊢O Γ', forall P2: ⊢O A::Δ,
+    cut_free P1_1 -> cut_free P1_2 -> cut_free P2 ->
+    (fm_rank A <= rk)%coq_nat -> 
+    (pf_size P1_1 + pf_size P1_2 + pf_size P2 < sz)%coq_nat ->
+    exists Q: ⊢O Γ ++ Δ, cut_free Q /\
+    ((Ovalidity (OMIX _ _ P1_1 P1_2) ⊗ Ovalidity P2)%NNGE)%:num <= (Ovalidity Q)%:num.
+Proof.
+  rewrite /IH_proof_sz => IHsz Heq P1_1 P1_2 P2 Hcf1_1 Hcf1_2 Hcf2 Hsz Hrk /=.
+  destruct (cat_cons_inv _ _ _ _ Heq) as [[Σ HΣ]|[HA HA']]; subst;
+  move: P2 Hcf2 Hrk => //;
+  have ->: A::Δ = (A`*) `*::Δ by rewrite -neg_involutive.
+  - move=> P2 Hcf2 Hrk.
+    destruct (IHsz [] _ _ _ P2 P1_1) as [Q [HQcut HQval]] => //=;
+      [by lia | by rewrite -rank_neg_invariant |].
+    inversion Heq. subst.
+    pose P := (OMIX _ _ P1_2 Q). simpl in P. 
+    rewrite -catA -(cat0s (_ ++ _ ++ _)) -(cats0 ([] ++ _)) -catA -catA.
+    suff [Q' [HQ'cut HQ'val]]: exists Q: ⊢O [] ++ (Γ' ++ Δ) ++ Σ ++ [], cut_free Q /\
+      (Ovalidity P1_1)%:num * (Ovalidity P1_2)%:num * (Ovalidity P2)%:num <=
+      (Ovalidity Q)%:num.
+      by destruct (list_list_exch Q') as [T [HTval HTcut]]; exists T;
+      split; [apply HTcut | rewrite -HTval].
+    rewrite cats0 cat0s -catA. exists P. split => //=.
+    rewrite muleC muleA (muleC _ (Ovalidity Q)%:num). 
+    by apply: lee_pmul.
+  - move=> P2 Hcf2 Hrk.
+    destruct (IHsz [] _ _ _ P2 P1_2) as [Q [HQcut HQval]] => //=;
+      [by lia | by rewrite -rank_neg_invariant |].
+    rewrite -(cat0s (_ ++ _)) -(cats0 ([] ++ _)) -catA -catA.
+    suff [Q' [HQ'cut HQ'val]]: exists Q: ⊢O [] ++ Δ ++ Γ ++ [], cut_free Q /\
+      (Ovalidity P1_1)%:num * (Ovalidity P1_2)%:num * (Ovalidity P2)%:num <=
+      (Ovalidity Q)%:num.
+      by destruct (list_list_exch Q') as [T [HTval HTcut]]; exists T;
+      split; [apply HTcut | rewrite -HTval].
+    rewrite cats0. exists (OMIX _ _ P1_1 Q). split => //=.
+    rewrite /= muleC in HQval. rewrite -muleA. 
+    by apply: lee_pmul.
+Qed.    
+
 Lemma cut_admissibility {Σ Γ Δ: list (@qll_formula R p atoms)} A:
   forall P1: ⊢O A `*::Γ, forall P2: ⊢O Σ ++ A::Δ, cut_free P1 -> cut_free P2 ->
     exists Q: ⊢O Σ ++ Γ ++ Δ, cut_free Q /\ ((Ovalidity P1 ⊗ Ovalidity P2)%NNGE <= Ovalidity Q)%O.
 Proof.
-  enough (forall rk sz Σ Γ Δ A (P1: ⊢O A `*::Γ) (P2: ⊢O Σ ++ A::Δ), (fm_rank A <= rk)%coq_nat -> sz = (pf_size P1 + pf_size P2)%N -> cut_free P1 -> cut_free P2 -> exists Q:  ⊢O Σ ++ Γ ++ Δ, cut_free Q /\ ((Ovalidity P1 ⊗ Ovalidity P2)%NNGE%:num <= (Ovalidity Q)%:num)%O) as H;
+  enough (forall rk sz Σ Γ Δ A (P1: ⊢O A `*::Γ) (P2: ⊢O Σ ++ A::Δ), (fm_rank A <= rk)%coq_nat -> sz = (pf_size P1 + pf_size P2)%N -> cut_free P1 -> cut_free P2 -> exists Q: ⊢O Σ ++ Γ ++ Δ, cut_free Q /\ ((Ovalidity P1 ⊗ Ovalidity P2)%NNGE%:num <= (Ovalidity Q)%:num)%O) as H;
     first by (move=> P1 P2; apply (H (fm_rank A) (pf_size P1 + pf_size P2)%N) => //).
   clear Σ Γ Δ A.
   induction rk as [rk IHrk0] using lt_wf_rect. 
@@ -292,65 +390,109 @@ Proof.
   - (* OCUT *)
     done.
   - (* OMIX *)
-     dichot_elt_app_inf_exec HeqΣAΔ; subst; destruct Hcf2 as [Hcf2l Hcf2r]. 
-    + specialize (IHsz Σ Γ Σ0 A P1 P2_1).
-      destruct IHsz as [Q [Hcf HQval]] => //=; first by lia.
-      rewrite catA catA -(catA Σ _ _). exists (OMIX _ _ Q P2_2).
-      repeat split => //=. rewrite muleA. 
-      by eapply (@lee_pmul _ ((Ovalidity P1)%:num * ((Ovalidity P2_1)%:num))) => //.
-    + specialize (IHsz Σ0 Γ Δ A P1 P2_2).
-      destruct IHsz as [Q [Hcf HQval]] => //=; first by lia.
-      rewrite -catA. exists (OMIX _ _ P2_1 Q). repeat split => //=.
-      rewrite (@muleC _ (Ovalidity P2_1)%:num (Ovalidity P2_2)%:num) muleA.
-      rewrite (@muleC _ (Ovalidity P2_1)%:num (Ovalidity Q)%:num).
-      eapply (@lee_pmul _ ((Ovalidity P1)%:num * ((Ovalidity P2_2)%:num))) => //.
+    destruct Hcf2.
+    eapply (cut_adm_mix_case (pf_size P1 + pf_size (OMIX _ _ P2_1 P2_2)) rk) => //=.
+    by lia.
   - (* OEXCH *)
     eapply (cut_adm_exch_case (pf_size P1 + (pf_size P2 + 1)) rk) => //. 
     by lia.
     (* Set Ltac Debug. *)
-   - (* Otensor *)
+  - (* Otensor *)
+    destruct Σ as [| D Σ]; inversion HeqΣAΔ; subst.
+    + remember ((B ⊗ C) `* :: Γ) as BCΓ. 
+      destruct_Oprv P1 Σ Σ' Δ D E P1_1 P1_2 P1; try inversion HeqBCΓ.
+      * have -> /=: D = B ⊗ C by rewrite (neg_involutive D) (neg_involutive (B ⊗ C)) H0.
+        rewrite mul1e. exists (Otensor _ _ _ _ P2_1 P2_2). by split.
+      * exists (OEFQ _) => /=. rewrite mul0e. by split.
+      * done.
+      * simpl. destruct Hcf1. 
+        pose P := Otensor _ _ _ _ P2_1 P2_2.
+        apply (cut_adm_mix_switch_case _ rk IHsz HeqBCΓ P1_1 P1_2 P) => //=.
+        by lia.
+      * simpl in IHsz. simpl. pose P2 := (Otensor _ _ _ _ P2_1 P2_2).
+        apply (cut_adm_exch_switch_case _ _ IHsz HeqBCΓ P1 P2) => //=.
+        by lia.
+      * simpl in *. inversion HeqBCΓ. subst. move: P2_1 P2_2 Hcf2 IHsz.
+        rewrite -(cat0s (B::Γ')) -(cat0s (C::Δ')) => P2_1 P2_2 Hcf2 IHzs.
+        destruct Hcf2 as [Hcf2_1 Hcf2_2].
+        destruct (IHrk _ _ _ _ P1 P2_1) as [Q1 [HQ1cut HQ1val]]  => //; first by lia.
+        move: Q1 HQ1cut HQ1val. rewrite catA -cat_cons_cat_lift cat0s => Q1 HQ1cut HQ1val. 
+        destruct (IHrk _ _ _ _ Q1 P2_2) as [Q2 [HQ2cut HQ2val]] => //; first by lia.
+        rewrite catA -(cat0s ((Γ ++ Γ') ++ Δ')). exists Q2. split => //.
+        eapply le_trans; last exact HQ2val. rewrite muleA.
+        by apply: (lee_pmul _ _ HQ1val _) => //.
+    + dichot_elt_app_inf_exec H1; subst; destruct Hcf2 as [Hcf2_1 Hcf2_2] => /=.
+      * destruct (IHsz (B::Σ) _ _ _ P1 P2_1) as [Q [HQcut HQval]] => //=; first by lia.
+        rewrite catA catA -(catA Σ). 
+        exists (Otensor _ _ (Σ ++ Γ ++ Σ0) _ Q P2_2). split => //=.
+        rewrite muleA. by apply: (lee_pmul _ _ HQval _).
+      * destruct (IHsz (C::Σ0) _ _ _ P1 P2_2) as [Q [HQcut HQval]] => //=; first by lia.
+        rewrite -catA. exists (Otensor _ _ _ (Σ0 ++ Γ ++ Δ) P2_1 Q).
+        split => //=. rewrite (muleC (Ovalidity P2_1)%:num _) muleA.
+        rewrite (muleC _ (Ovalidity Q)%:num). by apply: (lee_pmul _ _ HQval _).
+  -  destruct Σ as [| D Σ]; inversion HeqΣAΔ; subst.
+     + remember ((B ⊗* C) `* :: Γ) as BCΓ. 
+       destruct_Oprv P1 Σ Σ' Δ' D E P1_1 P1_2 P1; try inversion HeqBCΓ.
+       * have -> /=: D = B ⊗* C by rewrite (neg_involutive D) (neg_involutive (B ⊗* C)) H0.
+         rewrite mul1e => /=. exists (Opar _ _ _ P2). by split.
+       * exists (OEFQ _) => /=. rewrite mul0e. by split.
+       * done.
+       * simpl. destruct Hcf1. 
+         pose P := Opar _ _ _ P2. 
+         apply (cut_adm_mix_switch_case _ _ IHsz HeqBCΓ P1_1 P1_2 P) => //=.
+         by lia.
+       * pose P := Opar _ _ _ P2.
+         apply (cut_adm_exch_switch_case _ _ IHsz HeqBCΓ P1 P) => //=.
+         by lia.
+       * subst. destruct Hcf1 as [Hcf1_1 Hcf1_2]. 
+         move: P2 Hcf2 IHsz => /=. rewrite -(cat0s (_::_::_)) => P2 Hcf2 IHzs. 
+         destruct (IHrk _ _ _ _ P1_1 P2) as [Q1 [HQ1cut HQ1val]] => //;
+           first by (cbn in Hrk; lia).
+         destruct (IHrk _ _ _ _ P1_2 Q1) as [Q2 [HQ2cut HQ2val]] => //;
+           first by (cbn in Hrk; lia).
+         rewrite -catA. exists Q2. split => //=. 
+         eapply le_trans; last by apply HQ2val. 
+         rewrite (muleC _ (Ovalidity P1_2)%:num) -muleA. 
+         by apply: lee_pmul.
+     + move: P2 Hcf2 IHsz => /=.
+       rewrite -(cat0s (_ :: _)) cat_two_cons_cat_lift cat0s => P2 Hcf2 IHsz.
+       destruct (IHsz _ _ _ _ P1 P2) as [Q [HQcut HQval]] => //=; first by lia.
+       by exists (Opar _ _ _ Q).
+   - (* Oone *)
+     destruct Σ as [| B Σ]; inversion HeqΣAΔ; subst.
+     + remember (𝟙 `* :: Γ) as OneΓ. 
+       destruct_Oprv P1 Σ Σ' Δ' D E P1_1 P1_2 P1; try inversion HeqOneΓ.
+       * destruct Γ as [| A Γ]; inversion H1; subst.
+         have ->: A = 𝟙`* by rewrite -H0 -neg_involutive.
+         simpl. exists Oone. split => //=. rewrite mule1. 
+         by apply lexx.
+       * exists (OEFQ _) => /=. rewrite mul0e. by split.
+       * done.
+       * destruct Hcf1.
+         apply (cut_adm_mix_switch_case _ _ IHsz HeqOneΓ P1_1 P1_2 Oone) => //=.
+         by lia.
+       * apply (cut_adm_exch_switch_case _ _ IHsz HeqOneΓ P1 Oone) => //=.
+         by lia.
+       * exists OEMP. split => //=. rewrite mule1. 
+         by apply lexx.
+     + exfalso. by apply (list_elem_list_emp_inv _ _ _ H1).
+   - (* Oor *)
      destruct Σ as [| D Σ]; inversion HeqΣAΔ; subst.
-     + remember ((B ⊗ C) `* :: Γ)%SEQ as BCΓ. destruct_Oprv P1 Σ Σ' Δ D E P1_1 P1_2 P1; try inversion HeqBCΓ.
-       * destruct Γ as [|E Γ]; inversion H1; subst. simpl.
-         have H': E = B ⊗ C by rewrite (neg_involutive E) (neg_involutive (B ⊗ C)) H0.
-         subst. exists (Otensor _ _ _ _ P2_1 P2_2). split => //.
-         rewrite mul1e. by apply lexx.
-       * admit.
-       * admit.
-       * admit.
-       * simpl in IHsz. simpl. pose P2 := (Otensor _ _ _ _ P2_1 P2_2).
-         have H: (pf_size P2_1 + pf_size P2_2 + 1)%N = pf_size P2 by done.  
-         rewrite H -addnA -(addnC _ 1%N) addnA in IHsz. clear H.
-         have Hcf2': cut_free P2 by done; clear Hcf2.
-         have ->: (Ovalidity P2_1)%:num * (Ovalidity P2_2)%:num = (Ovalidity P2)%:num
-           by done.
-         move: P2 IHsz Hcf2'. rewrite (neg_involutive (B ⊗ C)) => P2 IHsz Hcf2'.
-         rewrite muleC -(cats0 (Γ ++ Γ' ++ Δ')) -catA -catA. (* Workaround, -(cats0 Δ') fails to rewrite *)
-         symmetry in HeqBCΓ. rewrite -(@cat0s _ ((B ⊗ C) `* :: Γ)) in HeqBCΓ.
-         destruct (cut_adm_exch_case (pf_size P1 + pf_size P2 + 1) rk IHsz HeqBCΓ P2 P1) as [Q [HQcut HQval]] => //;
-           [by lia | by rewrite -rank_neg_invariant |].
-         rewrite catA catA -(catA Γ Γ' Δ') -catA -(cat0s (Γ ++ (Γ' ++ Δ') ++ [])).
-         move: Q HQcut HQval. rewrite -(cats0 ([] ++ (Γ' ++ Δ') ++ Γ)) -catA -catA => Q HQcut HQval.
-         destruct (list_list_exch Q) as [Q' [HQ'val HQ'cut]].
-         exists Q'. split; first by apply HQ'cut. by rewrite -HQ'val.
-       * simpl in *. inversion HeqBCΓ. subst. move: P2_1 P2_2 Hcf2 IHsz.
-         rewrite -(cat0s (B::Γ')) -(cat0s (C::Δ')) => P2_1 P2_2 Hcf2 IHzs.
-         destruct Hcf2 as [Hcf2_1 Hcf2_2].
-         destruct (IHrk _ _ _ _ P1 P2_1) as [Q1 [HQ1cut HQ1val]]  => //; first by lia.
-         move: Q1 HQ1cut HQ1val. rewrite catA -cat_cons_cat_lift cat0s => Q1 HQ1cut HQ1val. 
-         destruct (IHrk _ _ _ _ Q1 P2_2) as [Q2 [HQ2cut HQ2val]] => //; first by lia.
-         rewrite catA -(cat0s ((Γ ++ Γ') ++ Δ')). exists Q2. split => //.
-         eapply le_trans; last exact HQ2val. rewrite muleA.
-         by apply: (lee_pmul _ _ HQ1val _) => //.
-     + dichot_elt_app_inf_exec H1; subst; destruct Hcf2 as [Hcf2_1 Hcf2_2] => /=.
-       * destruct (IHsz (B::Σ) _ _ _ P1 P2_1) as [Q [HQcut HQval]] => //=; first by lia.
-         rewrite catA catA -(catA Σ). 
-         exists (Otensor _ _ (Σ ++ Γ ++ Σ0) _ Q P2_2). split => //=.
-         rewrite muleA. by apply: (lee_pmul _ _ HQval _).
-       * destruct (IHsz (C::Σ0) _ _ _ P1 P2_2) as [Q [HQcut HQval]] => //=; first by lia.
-         rewrite -catA. exists (Otensor _ _ _ (Σ0 ++ Γ ++ Δ) P2_1 Q).
-         split => //=. rewrite (muleC (Ovalidity P2_1)%:num _) muleA.
-         rewrite (muleC _ (Ovalidity Q)%:num). by apply: (lee_pmul _ _ HQval _).
+     + remember ((B ∨[_] C) `*  :: Γ) as BCΓ.
+       destruct_Oprv P1 Σ Σ' Δ' D E P1_1 P1_2 P1; try inversion HeqBCΓ.
+       * have -> /=: D = (B ∨[_] C)
+           by rewrite (neg_involutive D) (neg_involutive (B ∨[_] C)) H0. 
+         rewrite mul1e. exists (Oor _ _ _ P2_1 P2_2). by split.
+       * exists (OEFQ _) => /=. rewrite mul0e. by split.
+       * done.
+       * destruct Hcf1. 
+         pose P := Oor _ _ _ P2_1 P2_2.
+         apply (cut_adm_mix_switch_case _ _ IHsz HeqBCΓ P1_1 P1_2 P) => //=.
+         by lia.
+       * pose P := Oor _ _ _ P2_1 P2_2.
+         apply (cut_adm_exch_switch_case _ _ IHsz HeqBCΓ P1 P) => //=.
+         by lia.
+       * inversion HeqBCΓ; subst.
 Admitted.
 End cut_elim.
 
