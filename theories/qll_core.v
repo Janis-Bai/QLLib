@@ -26,13 +26,13 @@ Section syntax.
 
 Open Scope qll_calculus.
 
-Inductive qll_connective {R: realType} {p: {nonneg \bar R}}: Type :=
+Inductive qll_connective {R: realType} {p: {posnum \bar R}}: Type :=
 | tensor: qll_connective
 | par: qll_connective
 | add_and: qll_connective
 | add_or: qll_connective.
 
-Inductive qll_formula {R: realType} {p: {nonneg \bar R}} {atoms: Type}: Type :=
+Inductive qll_formula {R: realType} {p: {posnum \bar R}} {atoms: Type}: Type :=
 | atom: atoms -> qll_formula
 | neg_atom: atoms -> qll_formula
 | one: qll_formula
@@ -60,7 +60,7 @@ Local Open Scope ereal_scope.
 Local Open Scope qll_calculus.
 
 Context {R: realType}.
-Context {p: {nonneg \bar R}}.
+Context {p: {posnum \bar R}}.
 Context {atoms: Type}.
 
 Fixpoint neg (form: @qll_formula R p atoms): qll_formula := match form with
@@ -92,7 +92,7 @@ Notation "A --o B" := (@bin _ _ _ par (neg A) B) (at level 45, right associativi
 Section deduction.
 
 Context {R: realType}.
-Context {p: {nonneg \bar R}}.  
+Context {p: {posnum \bar R}}.  
 Context {atoms: Type}.
 
 Local Open Scope ring_scope.
@@ -325,7 +325,7 @@ Ltac destruct_Oprv H Σ Γ Δ A B P1 P2 P :=
 Section semantics.
 
 Context {R: realType}.
-Context {p: {nonneg \bar R}}.  
+Context {p: {posnum \bar R}}.  
 Context {atoms: Type}.
 
 Local Open Scope ring_scope.
@@ -460,7 +460,7 @@ Qed.
 
 (** Evaluation of a formula without atoms where all additive connectives
     are annotated by 1 yields a nonnegative rational number or infinity *)
-Lemma eval_no_atoms_is_rat (f: @qll_formula R 1%:nng False):
+Lemma eval_no_atoms_is_rat (f: @qll_formula R 1%:pos False):
   (〚 f 〛_atom_func)%:num = +oo
     \/ exists q: rat, (0 <= q)%R /\
       (ratr q)%:E = (〚 f 〛_atom_func)%:num.
@@ -534,7 +534,7 @@ Proof.
     by rewrite rmorphN /= !opprK.
 Qed.
 
-Lemma eval_le_valid (f: @qll_formula R 1%:nng False):
+Lemma eval_le_valid (f: @qll_formula R 1%:pos False):
   exists P: [] ⊢ [f], (〚 f 〛_atom_func)%:num <= (validity P)%:num.
 Proof.
   induction f as [a|a| | | |[| | | ] f1 [P1 IH1] f2 [P2 IH2]].
@@ -559,7 +559,7 @@ Proof.
     by apply (@leeD _ _ _ _ (validity P2)%:num). *)
 Admitted.
 
-Corollary complete_for_rat (f: @qll_formula R 1%:nng False):
+Corollary complete_for_rat (f: @qll_formula R 1%:pos False):
   (〚 f 〛_atom_func)%:num <= |/ [] ⊢- [f] |/.
 Proof.
   destruct (eval_le_valid f) as [P HP].

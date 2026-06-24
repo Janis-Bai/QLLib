@@ -110,6 +110,12 @@ Proof.
   apply/val_inj => /=. by rewrite inveK.
 Qed.
 
+Lemma comulnnge_invnnge (a b: {nonneg \bar R}):
+  (a ⊗* b) `* = (a `* ⊗ b `*).
+Proof.
+  by rewrite /comulnnge invnnge_involutive.
+Qed.
+
 (** p-sum and harmonic p-sum are dual to each other *)
 Lemma p_sum_duality (p: \bar R) (a b: {nonneg \bar R}):
   p != 0 -> a ⊕[p] b = ((a `*) ⊕[-p] (b `*)) `*.
@@ -593,7 +599,6 @@ Proof.
     apply (@lt_le_trans _ _ 0%R%:E -oo b); last done.
     by rewrite ltNye.
 Qed.
-  
  
 Lemma mul_comul_equiv (a b c : {nonneg \bar R}):
   ((a ⊗ b)%:num <= c`*%:num) <-> (a%:num <= (b ⊗ c)`*%:num). (* Should we use = instead? *)
@@ -759,6 +764,15 @@ Proof.
   move=> Hp. rewrite (p_sumC _ _ a b) // (p_sumC _ _ a b') //.
   by apply p_sum_left_monotone.
 Qed.
+
+Lemma p_sum_both_monotone (a a' b b': {nonneg \bar R}) (p: \bar R):
+  0 < p -> (a <= a')%O -> (b <= b')%O
+    -> ((a ⊕[p] b) <= (a' ⊕[p] b'))%O.
+Proof.
+  move=> Hp Ha Hb.
+  eapply le_trans; first by apply (p_sum_left_monotone a a').
+  by apply p_sum_right_monotone.
+Qed.
   
 Lemma harmonic_p_sum_left_monotone (a a' b: {nonneg \bar R}) (p: \bar R):
   p < 0 -> a%:num <= a'%:num -> (a ⊕[p] b)%:num <= (a' ⊕[p] b)%:num.
@@ -772,6 +786,45 @@ Proof.
   by rewrite lee_pV2 //; rewrite /in_mem //=.
 Qed.
 
+Lemma p_sum_mulDr (a b c: {nonneg \bar R}) (p: \bar R):
+  0 < p -> c ⊗ (a ⊕[p] b) = (c ⊗ a) ⊕[p] (c ⊗ b).
+Proof.
+  move => Hp. apply/val_inj => /=.
+  move: (gee0P p) => [/(_ (ltW Hp)) [->|[r Hr Hr']] _].
+  - rewrite !p_sum_y !maxe_translation /=.
+    destruct (nng_nngy c) as [Hc|[x Hx Hx']].
+    + rewrite Hc /maxe. move: (nng_0pos a) (nng_0pos b) => [->|Ha] [->|Hb].
+      * rewrite !mule0.
+        by destruct ((0%R: \bar R) < 0%R) eqn:E; rewrite E mule0.
+      * rewrite Hb mule0 gt0_mulye //.
+        by have ->: 0%R < +oo by done.
+      * have ->: a%:num < 0%R = false by apply lt_gtF.
+        by rewrite mule0 gt0_mulye.
+      * rewrite (@gt0_mulye _ a%:num) // (@gt0_mulye _ b%:num) //.
+        by destruct (a%:num < b%:num) eqn:E; rewrite E;
+          destruct ((+oo: \bar R) < +oo) eqn:E'; rewrite E' gt0_mulye.
+    + rewrite Hx'. by apply: maxe_pMr.    
+  - subst. rewrite !p_sum_fin //=.
+    have ->: c%:num * adde (a%:num `^ r) (b%:num `^ r) `^ (1/r)
+         = c%:num `^ (r * r^-1) * (adde (a%:num `^ r) (b%:num `^ r)) `^ (1/r).
+      by rewrite divrr; [rewrite poweRe1 | apply unitf_gt0].
+    rewrite poweRrM.
+    have ->: (c%:num `^ r) `^ r^-1 = (c%:num `^ r) `^ (1/r) by rewrite div1r.
+    by rewrite -poweRM // ge0_muleDr // !poweRM.
+Qed.
+
+Lemma harmonic_p_sum_mulDr (a b c: {nonneg \bar R}) (p: \bar R):
+  p < 0 -> c ⊗* (a ⊕[p] b) = (c ⊗* a) ⊕[p] (c ⊗* b).
+Proof.
+  move => Hp.
+  have Hp': p != 0%R.
+    by apply lt_eqF in Hp; apply/eqP; move: Hp => /eqP.
+  rewrite p_sum_duality // (p_sum_duality _ (c ⊗* a) _) //.
+  rewrite !comulnnge_invnnge -p_sum_mulDr;
+    last by rewrite oppe_gt0.
+  by rewrite /comulnnge  invnnge_involutive.
+Qed.
+ 
 Lemma mul_p_sum_le_max_mul (a b c d: {nonneg \bar R}) (p: \bar R):
   p != 0 -> ((a ⊕[p] b) ⊗ (c ⊕[-p] d) <= maxe (a ⊗ c) (b ⊗ d))%O. 
 Proof.
