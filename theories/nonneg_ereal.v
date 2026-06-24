@@ -772,4 +772,8 @@ Proof.
   by rewrite lee_pV2 //; rewrite /in_mem //=.
 Qed.
 
+Lemma mul_p_sum_le_max_mul (a b c d: {nonneg \bar R}) (p: \bar R):
+  p != 0 -> ((a ⊕[p] b) ⊗ (c ⊕[-p] d) <= maxe (a ⊗ c) (b ⊗ d))%O. 
+Proof.
+Admitted.
 End results.
