@@ -102,6 +102,82 @@ Proof.
   - by move=> [|[|k]] _ //=; apply poweR_ge0.
 Qed.
 
+(** Case analysis lemmas *)
+Lemma nng_in_itv (a: \bar R):  Itv.spec ext_num_sem (Itv.Real `[0%Z, +oo[) a -> 0 <= a.
+Proof.
+  rewrite /ext_num_sem /Itv.spec. move=> /andP. rewrite in_itv /=.
+  by move=> [_ /andP [Ha _]]. (* This notation is a mystery, discovered by accident *)
+Qed.
+
+Lemma nng_nngy (a: {nonneg \bar R}):
+  (a%:num = +oo) \/ exists2 r, (r%:E >= 0) & a%:num = r%:E.
+Proof.
+  destruct a as [a Ha].
+  have Hnng /=: 0 <= a by apply nng_in_itv.
+  move: (gee0P a)=> [/(_ Hnng) [->|Hr] _]; first by left.
+  by right.
+Qed.
+
+Lemma nng_0posy (a: {nonneg \bar R}):
+  (a%:num = +oo) \/ (a%:num = 0) \/ exists2 r, (r%:E > 0) & a%:num = r%:E.
+Proof.
+  move: (nng_nngy a)=> [->|[r Hrnng ->]]; first by left.
+  rewrite le_eqVlt in Hrnng.
+  move: Hrnng => /orP [/eqP <-|Hr].
+  - right. by left.
+  - right. right. by exists r.
+Qed.
+
+Lemma nng_0posy' (a: {nonneg \bar R}):
+  (a = +oo%:nng) \/ (a = 0%:E%:nng) \/ 0 < a%:num < +oo.
+Proof.
+  move: (nng_0posy a) => /= [Hy|[H0|[r Hr ->]]].
+  - left. by apply/val_inj.
+  - right. left. by apply/val_inj.
+  - right. right. apply/andP. split; first done.
+    apply (ltry r).
+Qed.
+
+Lemma gt0_nng_posy {a: {nonneg \bar R}}:
+  0 < a%:num -> a%:num = +oo \/ exists2 r, (r%:E > 0) & a%:num = r%:E.
+Proof.
+  move=> Ha. destruct (nng_0posy a) as [->|[Ha'|[r Hr Hr']]]; subst.
+  - by left.
+  - rewrite Ha' in Ha. by rewrite ltxx in Ha.
+  - right. exists r => //.
+Qed.
+
+Lemma lty_nng_0pos {a: {nonneg \bar R}}:
+  a%:num < +oo -> a%:num = 0 \/ exists2 r, (r%:E > 0) & a%:num = r%:E.
+Proof.
+  move=> Ha. destruct (nng_0posy a) as [Ha'|[->|[r Hr Hr']]]; subst.
+  - rewrite Ha' in Ha. by rewrite ltxx in Ha.
+  - by left.
+  - right. exists r => //.
+Qed.
+
+Lemma nng_0pos (a: {nonneg \bar R}):
+  (a%:num = 0) \/ (a%:num > 0).
+Proof.
+  destruct (nng_0posy a) as [->|[->|[r Hr ->]]].
+  - by right.
+  - by left.
+  - by right.
+Qed.
+
+Lemma fin_inveM_def_by_ineq (a b: \bar R):
+  0%R < a -> 0%R < b -> a < +oo -> b < +oo -> (inveM_def (R:=R) a b).
+Proof.
+  rewrite !lt0e. move=> /andP [Ha Ha'] /andP [Hb Hb'] Ha'' Hb''.
+  apply fin_inveM_def; try done.
+  - apply fin_real. apply/andP. split; last done.
+    apply (@lt_le_trans _ _ 0%R%:E -oo a); last done.
+    by rewrite ltNye.
+  - apply fin_real. apply/andP. split; last done.
+    apply (@lt_le_trans _ _ 0%R%:E -oo b); last done.
+    by rewrite ltNye.
+Qed.
+
 (** Inversion is involutive *)
 Lemma invnnge_involutive:
   involutive (@invnnge R).
@@ -114,6 +190,91 @@ Lemma comulnnge_invnnge (a b: {nonneg \bar R}):
   (a ⊗* b) `* = (a `* ⊗ b `*).
 Proof.
   by rewrite /comulnnge invnnge_involutive.
+Qed.
+
+Lemma mul0nng (a b: {nonneg \bar R}):
+  a%:num = 0 -> a ⊗ b = 0%:E%:nng.
+Proof.
+  move=> Ha. apply /val_inj => /=.
+  by rewrite Ha mul0e.
+Qed.
+
+Lemma mulnng0 (a b: {nonneg \bar R}):
+  b%:num = 0 -> a ⊗ b = 0%:E%:nng.
+Proof.
+  move=> Hb. apply /val_inj => /=.
+  by rewrite Hb mule0.
+Qed.
+
+Lemma comulynng (a b: {nonneg \bar R}):
+  a%:num = +oo -> a ⊗* b = +oo%:nng.
+Proof.
+  move=> Ha. apply/val_inj => /=.
+  by rewrite Ha invey mul0e inve0.
+Qed.
+
+Lemma comulnngy (a b: {nonneg \bar R}):
+  b%:num = +oo -> a ⊗* b = +oo%:nng.
+Proof.
+  move=> Hb. apply/val_inj => /=.
+  by rewrite Hb invey mule0 inve0.
+Qed.
+
+Lemma fin_gt0_comulnnge_eq_mulnnge (r s: R):
+  0 < r%:E -> 0 < s%:E -> (r%:E^-1 * s%:E^-1)^-1 = r%:E * s%:E.
+Proof.
+  move=> Hr Hs.
+  rewrite -inveM; last by (apply: fin_inveM_def_by_ineq; try apply: ltry).
+  by rewrite inveK.
+Qed.
+
+Lemma comulnngery_eq_mulnngery (r: R):
+  0 < r%:E -> (r%:E^-1 * +oo^-1)^-1 = r%:E * +oo.
+Proof.
+  move=> Hr.
+  by rewrite gt0_muley // invey mule0 inve0.
+Qed.
+
+(* TODO Discuss how to make proof nicer *)
+Lemma comulnnger0_eq_mulnnger0 (r: R):
+  0 < r%:E -> (r%:E^-1 * 0^-1)^-1 = r%:E * 0.
+Proof.
+  move=> Hr.
+  rewrite inve0 mule0 gt0_muley; first by rewrite invey.
+  rewrite inve_gt0 //. apply/eqP. move=> H. rewrite H in Hr.
+  by rewrite ltxx in Hr.
+Qed.
+
+(* The following proof contains lots of repetitions. How to improve on this? *)
+Lemma neq0y_comulnnge_eq_mulnnge (a b: {nonneg \bar R}):
+  (0 < a%:num \/ b%:num < +oo) /\ (0 < b%:num \/ a%:num < +oo)
+     -> a ⊗* b = a ⊗ b.
+Proof.
+  move=> [[Ha1|Hb1] [Hb2|Ha2]]; apply/val_inj => /=.
+  - move: (gt0_nng_posy Ha1) (gt0_nng_posy Hb2).
+    move => [->|[r Hr ->]] [->|[s Hs ->]].
+    + by rewrite invey mul0e inve0 gt0_muley.
+    + by rewrite muleC (muleC +oo) comulnngery_eq_mulnngery.
+    + by rewrite comulnngery_eq_mulnngery.
+    + by rewrite fin_gt0_comulnnge_eq_mulnnge.
+  - move: (gt0_nng_posy Ha1) => [Ha|[r Hr Hr']].
+    + by rewrite Ha in Ha2.
+    + rewrite Hr'. move: (nng_0posy b) => [->|[->|[s Hs ->]]].
+      * by rewrite comulnngery_eq_mulnngery.
+      * by rewrite comulnnger0_eq_mulnnger0.
+      * by rewrite fin_gt0_comulnnge_eq_mulnnge.
+  - move: (gt0_nng_posy Hb2) => [Hb|[r Hr Hr']].
+    + by rewrite Hb in Hb1.
+    + rewrite Hr'. move: (nng_0posy a) => [->|[->|[s Hs ->]]].
+      * by rewrite muleC (muleC +oo) comulnngery_eq_mulnngery.
+      * by rewrite muleC (muleC 0%R) comulnnger0_eq_mulnnger0.
+      * by rewrite fin_gt0_comulnnge_eq_mulnnge.
+  - move: (lty_nng_0pos Ha2) (lty_nng_0pos Hb1).
+    move => [->|[r Hr ->]] [->|[s Hs ->]].
+    + by rewrite !inve0 mule0 invey.
+    + by rewrite muleC (muleC 0%R) comulnnger0_eq_mulnnger0.
+    + by rewrite comulnnger0_eq_mulnnger0.
+    + by rewrite fin_gt0_comulnnge_eq_mulnnge.
 Qed.
 
 (** p-sum and harmonic p-sum are dual to each other *)
@@ -306,51 +467,6 @@ Proof.
       by rewrite inveK.
 Qed.
 
-(** More technical utility lemmas *)
-Lemma nng_in_itv (a: \bar R):  Itv.spec ext_num_sem (Itv.Real `[0%Z, +oo[) a -> 0 <= a.
-Proof.
-  rewrite /ext_num_sem /Itv.spec. move=> /andP. rewrite in_itv /=.
-  by move=> [_ /andP [Ha _]]. (* This notation is a mystery, discovered by accident *)
-Qed.
-
-Lemma nng_nngy (a: {nonneg \bar R}):
-  (a%:num = +oo) \/ exists2 r, (r%:E >= 0) & a%:num = r%:E.
-Proof.
-  destruct a as [a Ha].
-  have Hnng /=: 0 <= a by apply nng_in_itv.
-  move: (gee0P a)=> [/(_ Hnng) [->|Hr] _]; first by left.
-  by right.
-Qed.
-
-Lemma nng_0posy (a: {nonneg \bar R}):
-  (a%:num = +oo) \/ (a%:num = 0) \/ exists2 r, (r%:E > 0) & a%:num = r%:E.
-Proof.
-  move: (nng_nngy a)=> [->|[r Hrnng ->]]; first by left.
-  rewrite le_eqVlt in Hrnng.
-  move: Hrnng => /orP [/eqP <-|Hr].
-  - right. by left.
-  - right. right. by exists r.
-Qed.
-
-Lemma nng_0posy' (a: {nonneg \bar R}):
-  (a = +oo%:nng) \/ (a = 0%:E%:nng) \/ 0 < a%:num < +oo.
-Proof.
-  move: (nng_0posy a) => /= [Hy|[H0|[r Hr ->]]].
-  - left. by apply/val_inj.
-  - right. left. by apply/val_inj.
-  - right. right. apply/andP. split; first done.
-    apply (ltry r).
-Qed.
-
-Lemma nng_0pos (a: {nonneg \bar R}):
-  (a%:num = 0) \/ (a%:num > 0).
-Proof.
-  destruct (nng_0posy a) as [->|[->|[r Hr ->]]].
-  - by right.
-  - by left.
-  - by right.
-Qed.
-
 Lemma pos_implies_non0 (r: R):
   0%R < r%:E -> r%:E != 0.
 Proof.
@@ -382,6 +498,20 @@ Lemma pos_implies_nng (r: R):
   0%R < r%:E -> (0 <= r)%R.
 Proof.
   rewrite lt0e. by move=> /andP [_ //].
+Qed.
+
+(* TODO Generalise for arbitrary odered types *)
+Lemma lt_neq (p q: \bar R):
+  (p < q)%O -> p != q.
+Proof.
+  move=> /lt_eqF /eqP H; by apply/eqP.
+Qed.
+
+Lemma lt_neq_sym (p q: \bar R):
+  (p < q)%O -> q != p.
+Proof.
+  move=> H. apply/eqP. symmetry. apply/eqP.
+  move: H. by apply lt_neq.
 Qed.
        
 Lemma lee0P (p: \bar R) : p <= 0 <-> p = -oo \/ exists2 r, (r <= 0)%R & p = r%:E.
@@ -545,8 +675,83 @@ Proof.
   rewrite p_sum_duality // (p_sum_duality _ b c) // invnnge_involutive.
   rewrite (p_sum_duality _ a b) //  (p_sum_duality _ _ c) //.
   by rewrite invnnge_involutive p_sumA // oppe_gt0.
-Qed.  
-    
+Qed.
+
+Lemma p_sum_0nng (a b: {nonneg \bar R}) (p: \bar R):
+  0 < p -> a%:num = 0 -> a ⊕[p] b = b.
+Proof.
+  move=> Hp Ha. apply/val_inj => /=.
+  move: (gee0P p) => [/(_ (ltW Hp)) [->|[r _ Hr]] _].
+  - rewrite p_sum_y maxe_translation /maxe Ha.
+    destruct (0 < b%:num) eqn:E => //.
+    have: 0 <= b%:num by done.
+    rewrite le_eqVlt => /orP [/eqP //|Hb]. by rewrite Hb in E.  
+  - subst. rewrite p_sum_fin //= Ha poweR0r;
+      last by (apply/eqP => Hr; rewrite Hr ltxx in Hp).
+    have ->: adde 0%R (b%:num `^ r)  = 0 + b%:num `^ r by done.
+    rewrite add0e -poweRrM mul1r divrr; first by rewrite poweRe1.
+    by apply unitf_gt0.
+Qed.
+
+Lemma p_sum_nng0 (a b: {nonneg \bar R}) (p: \bar R):
+  0 < p -> b%:num = 0 -> a ⊕[p] b = a.
+Proof.
+  move=> Hp. rewrite p_sumC //. by apply p_sum_0nng.
+Qed.
+
+Lemma harmonic_p_sum_ynng (a b: {nonneg \bar R}) (p: \bar R):
+  p < 0 -> a%:num = +oo -> a ⊕[p] b = b.
+Proof.
+  move=> Hp Ha. rewrite p_sum_duality; last by apply lt_neq.
+  have Hainv: (a `*)%:num = 0 by rewrite -invey /=; f_equal.
+  rewrite p_sum_0nng //; last by rewrite oppe_gt0.
+  by rewrite invnnge_involutive.
+Qed.
+
+Lemma harmonic_p_sum_nngy (a b: {nonneg \bar R}) (p: \bar R):
+  p < 0 -> b%:num = +oo -> a ⊕[p] b = a.
+Proof.
+  move=> Hp. rewrite harmonic_p_sumC //. by apply harmonic_p_sum_ynng.
+Qed.
+
+Lemma p_sum_ynng (a b: {nonneg \bar R}) (p: \bar R):
+  0 < p -> a%:num = +oo -> a ⊕[p] b = +oo%:nng.
+Proof.
+  move=> Hp Ha. apply/val_inj => /=.
+  move: (gee0P p) => [/(_ (ltW Hp)) [->|[r _ Hr]] _].
+  - by rewrite p_sumC // p_sum_y maxe_translation Ha real_maxey.
+  - subst. rewrite p_sum_fin //= Ha.
+    have ->: adde (+oo `^ r) (b%:num `^ r) = +oo `^ r + b%:num `^ r by done.
+    rewrite poweRyr; last by (apply/eqP => H; rewrite H ltxx in Hp).
+    rewrite addye; last by (rewrite -ltNye; apply: (@lt_le_trans _ _ 0)).
+    rewrite poweRyr //. rewrite div1r.
+    suff: (r^-1%R == 0%R = false) by move => /eqP Hr; apply/eqP.
+    by rewrite gt_eqF // invr_gt0.
+Qed.
+
+Lemma p_sum_nngy  (a b: {nonneg \bar R}) (p: \bar R):
+  0 < p -> b%:num = +oo -> a ⊕[p] b = +oo%:nng.
+Proof.
+  move=> Hp Hb. by rewrite p_sumC // p_sum_ynng.
+Qed.
+
+Lemma harmonic_p_sum_0nng (a b: {nonneg \bar R}) (p: \bar R):
+  p < 0 -> a%:num = 0 -> a ⊕[p] b = 0%:E%:nng.
+Proof.
+  move=> Hp Ha. rewrite p_sum_duality; last by apply lt_neq.
+  have Hainv: (a `*)%:num = +oo by rewrite -inve0 /=; f_equal.
+  rewrite p_sum_ynng //; last by rewrite oppe_gt0.
+  apply/val_inj => /=. by rewrite invey.
+Qed.
+
+Lemma harmonic_p_sum_nng0 (a b: {nonneg \bar R}) (p: \bar R):
+  p < 0 -> b%:num = 0 -> a ⊕[p] b = 0%:E%:nng.
+Proof.           
+  move=> Hp Hb. rewrite harmonic_p_sumC //.
+  by rewrite harmonic_p_sum_0nng.
+Qed.
+
+
 (* Automation to solve x <= +oo would be nice *)
 (** ** Interplay of the connectives *)
 Lemma mul_comul_ineq (a b : {nonneg \bar R}): (a ⊗ b)%:num <= (a ⊗* b)%:num.
@@ -585,19 +790,6 @@ Proof.
   move=> Ha1 Ha2.
   apply fin_real. apply/andP. split; last done.
   by eapply lt_le_trans; last exact Ha1.
-Qed.
-
-Lemma fin_inveM_def_by_ineq (a b: \bar R):
-  0%R < a -> 0%R < b -> a < +oo -> b < +oo -> (inveM_def (R:=R) a b).
-Proof.
-  rewrite !lt0e. move=> /andP [Ha Ha'] /andP [Hb Hb'] Ha'' Hb''.
-  apply fin_inveM_def; try done.
-  - apply fin_real. apply/andP. split; last done.
-    apply (@lt_le_trans _ _ 0%R%:E -oo a); last done.
-    by rewrite ltNye.
-  - apply fin_real. apply/andP. split; last done.
-    apply (@lt_le_trans _ _ 0%R%:E -oo b); last done.
-    by rewrite ltNye.
 Qed.
  
 Lemma mul_comul_equiv (a b c : {nonneg \bar R}):
@@ -740,7 +932,18 @@ Lemma harmonic_p_sum_right_semiadditive (a b: {nonneg \bar R}) (p: \bar R):
 Proof.
   move=> Hp. rewrite harmonic_p_sumC //.
   by apply harmonic_p_sum_left_semiadditive.
-Qed.    
+Qed.
+
+Lemma lty_p_sum_lty (a b: {nonneg \bar R}) (p: \bar R):
+  0 < p -> a%:num < +oo -> b%:num < +oo -> (a ⊕[p] b)%:num < +oo.
+Proof.
+  move=> Hp Ha Hb.
+  move: (gee0P p) => [/(_ (ltW Hp)) [->|[r _ Hr]] _].
+  - rewrite p_sum_y maxe_translation num_gte_max.
+    apply/andP. by split.
+  - subst. rewrite p_sum_fin //=. apply poweR_lty.
+    by apply: lte_add_pinfty; apply poweR_lty.
+Qed.
 
 Local Ltac itv_solve := rewrite in_itv /=; apply/andP; split; first done; apply (@leey R).
 
@@ -786,10 +989,27 @@ Proof.
   by rewrite lee_pV2 //; rewrite /in_mem //=.
 Qed.
 
+Lemma harmonic_p_sum_right_monotone (a b b': {nonneg \bar R}) (p: \bar R):
+  p < 0 -> b%:num <= b'%:num -> (a ⊕[p] b)%:num <= (a ⊕[p] b')%:num.
+Proof.
+  move=> Hp. rewrite (harmonic_p_sumC _ _ a b) //.
+  rewrite (harmonic_p_sumC _ _ a b') //.
+  by apply harmonic_p_sum_left_monotone.
+Qed.
+
+Lemma harmonic_p_sum_both_monotone (a a' b b': {nonneg \bar R}) (p: \bar R):
+  p < 0 -> (a <= a')%O -> (b <= b')%O
+    -> ((a ⊕[p] b) <= (a' ⊕[p] b'))%O.
+Proof.
+  move=> Hp Ha Hb.
+  eapply le_trans; first by apply (harmonic_p_sum_left_monotone a a').
+  by apply harmonic_p_sum_right_monotone.
+Qed.
+
 Lemma p_sum_mulDr (a b c: {nonneg \bar R}) (p: \bar R):
   0 < p -> c ⊗ (a ⊕[p] b) = (c ⊗ a) ⊕[p] (c ⊗ b).
 Proof.
-  move => Hp. apply/val_inj => /=.
+  move=> Hp. apply/val_inj => /=.
   move: (gee0P p) => [/(_ (ltW Hp)) [->|[r Hr Hr']] _].
   - rewrite !p_sum_y !maxe_translation /=.
     destruct (nng_nngy c) as [Hc|[x Hx Hx']].
@@ -813,16 +1033,108 @@ Proof.
     by rewrite -poweRM // ge0_muleDr // !poweRM.
 Qed.
 
-Lemma harmonic_p_sum_mulDr (a b c: {nonneg \bar R}) (p: \bar R):
+Lemma harmonic_p_sum_comulDr (a b c: {nonneg \bar R}) (p: \bar R):
   p < 0 -> c ⊗* (a ⊕[p] b) = (c ⊗* a) ⊕[p] (c ⊗* b).
 Proof.
-  move => Hp.
+  move=> Hp.
   have Hp': p != 0%R.
     by apply lt_eqF in Hp; apply/eqP; move: Hp => /eqP.
   rewrite p_sum_duality // (p_sum_duality _ (c ⊗* a) _) //.
   rewrite !comulnnge_invnnge -p_sum_mulDr;
     last by rewrite oppe_gt0.
   by rewrite /comulnnge  invnnge_involutive.
+Qed.
+
+Lemma p_sum_comulDr (a b c: {nonneg \bar R}) (p: \bar R):
+  0 < p -> c ⊗* (a ⊕[p] b) = (c ⊗* a) ⊕[p] (c ⊗* b).
+Proof.
+  move=> Hp. apply/val_inj => /=.
+  move: (nng_0posy c) => [Hc|[Hc|[r Hr Hr']]].
+  - rewrite !comulynng // (p_sum_ynng +oo%:nng) //=.
+    by rewrite Hc invey mul0e inve0.
+  - rewrite Hc inve0.
+    move: (nng_0posy a) => [Ha|[Ha|[s Hs Hs']]].
+    + rewrite comulnngy // (p_sum_ynng +oo%:nng) //.
+      by rewrite (p_sum_ynng a) //= invey mule0 inve0.
+    + rewrite (p_sum_0nng a) //. Check neq0y_comulnnge_eq_mulnnge.
+      move: (nng_0posy b) => [Hb|[Hb|[t Ht Ht']]].
+      * rewrite (comulnngy _ b) // p_sum_nngy //= Hb.
+        by rewrite invey mule0 inve0.
+      * rewrite (neq0y_comulnnge_eq_mulnnge c a);
+          last by split; [right; rewrite Ha | right; rewrite Hc].
+        rewrite (neq0y_comulnnge_eq_mulnnge c b);
+          last by split; [right; rewrite Hb | right; rewrite Hc].
+        rewrite -p_sum_mulDr // (p_sum_0nng a) //= Hc mul0e.
+        by rewrite Hb inve0 gt0_muley.
+      * rewrite (neq0y_comulnnge_eq_mulnnge c a);
+          last by split; [right; rewrite Ha | right; rewrite Hc].
+        rewrite (neq0y_comulnnge_eq_mulnnge c b);
+          last by split; [right; rewrite Ht' ltry | right; rewrite Hc].
+        rewrite -p_sum_mulDr // (p_sum_0nng a) //= Hc mul0e.
+        rewrite gt0_mulye // inve_gt0 ?Ht' //.
+        by apply lt_neq_sym.
+    + move: (nng_0posy b) => [Hb|[Hb|[t Ht Ht']]].
+      * rewrite (p_sum_nngy a) //= invey mule0 inve0.
+        by rewrite (comulnngy _ b) // (p_sum_nngy _ +oo%:nng).
+      * rewrite (p_sum_nng0 a) //.
+        rewrite (neq0y_comulnnge_eq_mulnnge c a);
+          last by split; [right; rewrite Hs' ltry | right; rewrite Hc].
+        rewrite (neq0y_comulnnge_eq_mulnnge c b);
+          last by split; [right; rewrite Hb | right; rewrite Hc].
+        rewrite -p_sum_mulDr // mul0nng //= gt0_mulye ?invey //.
+        rewrite inve_gt0 Hs' //. by apply lt_neq_sym.
+      * rewrite (neq0y_comulnnge_eq_mulnnge c a);
+          last by split; [right; rewrite Hs' ltry | right; rewrite Hc].
+        rewrite (neq0y_comulnnge_eq_mulnnge c b);
+          last by split; [right; rewrite Ht' ltey | right; rewrite Hc].
+        rewrite -p_sum_mulDr // mul0nng //= gt0_mulye ?invey //.
+        have Hab: 0%R < (a ⊕ [p] b)%:num.
+          eapply lt_le_trans; last by apply: p_sum_left_semiadditive. by rewrite Hs'.
+        rewrite inve_gt0 //; first by apply lt_neq_sym.
+        rewrite -ltey. by apply lty_p_sum_lty; rewrite ?Hs' ?Ht' ?ltry.
+  - move: (nng_0posy a) => [Ha|[Ha|[s Hs Hs']]].
+    + rewrite p_sum_ynng //= invey mule0 inve0.
+      by rewrite (comulnngy c a) // (p_sum_ynng +oo%:nng).
+    + move: (nng_0posy b) => [Hb|[Hb|[t Ht Ht']]].
+      * rewrite p_sum_nngy //= invey mule0 inve0.
+        by rewrite (comulnngy c b) // (p_sum_nngy _ +oo%:nng).
+      * rewrite (p_sum_nng0 a) //.
+        rewrite (neq0y_comulnnge_eq_mulnnge c a);
+          last by split; [right; rewrite Ha | right; rewrite Hr' ltry].
+        rewrite (neq0y_comulnnge_eq_mulnnge c b);
+          last by split; [right; rewrite Hb | right; rewrite Hr' ltry].
+        rewrite -p_sum_mulDr // p_sum_0nng // mulnng0 //=.
+        rewrite Ha inve0 gt0_muley ?invey // Hr'.
+        rewrite inve_gt0 //. by apply lt_neq_sym.
+      * rewrite p_sum_0nng //.
+        rewrite (neq0y_comulnnge_eq_mulnnge c a);
+          last by split; [right; rewrite Ha | right; rewrite Hr' ltry].
+        rewrite (neq0y_comulnnge_eq_mulnnge c b);
+          last by split; [right; rewrite Ht' ltry | right; rewrite Hr' ltry].
+        rewrite -p_sum_mulDr // p_sum_0nng //= Hr' Ht'.
+        by apply fin_gt0_comulnnge_eq_mulnnge.
+    + rewrite (neq0y_comulnnge_eq_mulnnge c a);
+        last by split; [right; rewrite Hs' ltry | right; rewrite Hr' ltry].
+      rewrite (neq0y_comulnnge_eq_mulnnge c b);
+        last by split; [left; rewrite Hr' | right; rewrite Hr' ltry].
+      rewrite -p_sum_mulDr // -neq0y_comulnnge_eq_mulnnge // Hr'.
+      split; first by left.
+      right. by rewrite ltry.
+Qed.
+
+Lemma harmonic_p_sum_mulDr (a b c: {nonneg \bar R}) (p: \bar R):
+  p < 0 -> c ⊗ (a ⊕[p] b) = (c ⊗ a) ⊕[p] (c ⊗ b).
+Proof.
+  move=> Hp. rewrite p_sum_duality; last by apply lt_neq.
+  rewrite (p_sum_duality _ (c ⊗ a)); last by apply lt_neq.
+  rewrite -(invnnge_involutive c).
+  have ->: ((c `*) `* ⊗ a) = ((c `*) `* ⊗ (a `*) `*)
+    by rewrite (invnnge_involutive a).
+  have ->: ((c `*) `* ⊗ b) = ((c `*) `* ⊗ (b `*) `*)
+    by rewrite (invnnge_involutive b).
+  rewrite -!comulnnge_invnnge.
+  rewrite p_sum_comulDr ?oppe_gt0 //.
+  by rewrite !invnnge_involutive.
 Qed.
  
 Lemma mul_p_sum_le_max_mul (a b c d: {nonneg \bar R}) (p: \bar R):
