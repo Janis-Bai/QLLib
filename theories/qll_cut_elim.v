@@ -15,41 +15,7 @@ Context {R: realType}.
 Context {p: {posnum \bar R}}.
 Context {atoms: Type}.
 
-Open Scope qll_calculus.
-
-(* Variable size: forall {Δ: Corelib.Init.Datatypes.list (@qll_formula R p atoms)}, ⊢O  Δ -> nat. *)
-
-(* Ltac unit_vs_elt_inv H := 
-  match type of H with
-  | ?a :: nil = ?l1 ++ ?x :: ?l2 =>
-      let Hnil1 := fresh in
-      let Hnil2 := fresh in
-      symmetry in H; apply elt_eq_unit in H as [H [Hnil1 Hnil2]];
-      (try subst x); (try subst a); rewrite ?Hnil1; rewrite ?Hnil2 in *;
-      clear Hnil1 Hnil2; (try clear l1); (try clear l2)
-  | ?l1 ++ ?x :: ?l2 = ?a :: nil =>
-      let Hnil1 := fresh in
-      let Hnil2 := fresh in
-      apply elt_eq_unit in H as [H [Hnil1 Hnil2]];
-      (try subst x); (try subst a); rewrite ?Hnil1; rewrite ?Hnil2 in *;
-      clear Hnil1 Hnil2; (try clear l1); (try clear l2)
-  end. *)
-
-
-(* Lemma tst {Σ Γ Δ: list (@qll_formula R p atoms)} A:
-  ⊢O A `*::Γ -> ⊢O Σ ++ A::Δ -> ⊢O Σ ++ Γ ++ Δ.
-Proof.
-  move=> P1 P2.
-  have H: forall n: nat, (n < size P2)%N -> n = S n. by admit.
-  remember (Σ ++ (A :: Δ)%SEQ) as l. destruct P2.
-  -  destruct Σ; inversion Heql; subst. simpl. admit.
-    
-     symmetry in H2. apply elt_eq_unit in H2 as [Hn [Hm Hk]]. rewrite -Hn Hm Hk.
-     inversion Heql. rewrite Hm Hk /= in Heql. by rewrite cats0 /=.
-  - by destruct Σ; inversion Heql.
-  - by apply OEFQ.
-Admitted. *)
-     
+Open Scope qll_calculus.     
 
 Fixpoint fm_rank (form: @qll_formula R p atoms) := match form with
   | atom _ | neg_atom _ | 𝟙 | ⊥ | ⊤  => 1
@@ -432,7 +398,6 @@ Proof.
   - (* OEXCH *)
     eapply (cut_adm_exch_case (pf_size P1 + (pf_size P2 + 1)) rk) => //. 
     by lia.
-    (* Set Ltac Debug. *)
   - (* Otensor *)
     destruct Σ as [| D Σ]; inversion HeqΣAΔ; subst.
     + remember ((B ⊗ C) `* :: Γ) as BCΓ. 
@@ -466,34 +431,35 @@ Proof.
         rewrite -catA. exists (Otensor _ _ _ (Σ0 ++ Γ ++ Δ) P2_1 Q).
         split => //=. rewrite (muleC (Ovalidity P2_1)%:num _) muleA.
         rewrite (muleC _ (Ovalidity Q)%:num). by apply: (lee_pmul _ _ HQval _).
-  -  destruct Σ as [| D Σ]; inversion HeqΣAΔ; subst.
-     + remember ((B ⊗* C) `* :: Γ) as BCΓ. 
-       destruct_Oprv P1 Σ Σ' Δ' D E P1_1 P1_2 P1; try inversion HeqBCΓ.
-       * have -> /=: D = B ⊗* C by rewrite (neg_involutive D) (neg_involutive (B ⊗* C)) H0.
-         rewrite mul1e => /=. exists (Opar _ _ _ P2). by split.
-       * exists (OEFQ _) => /=. rewrite mul0e. by split.
-       * done.
-       * simpl. destruct Hcf1. 
-         pose P := Opar _ _ _ P2. 
-         apply (cut_adm_mix_switch_case _ _ IHsz HeqBCΓ P1_1 P1_2 P) => //=.
-         by lia.
-       * pose P := Opar _ _ _ P2.
-         apply (cut_adm_exch_switch_case _ _ IHsz HeqBCΓ P1 P) => //=.
-         by lia.
-       * subst. destruct Hcf1 as [Hcf1_1 Hcf1_2]. 
-         move: P2 Hcf2 IHsz => /=. rewrite -(cat0s (_::_::_)) => P2 Hcf2 IHzs. 
-         destruct (IHrk _ _ _ _ P1_1 P2) as [Q1 [HQ1cut HQ1val]] => //;
-           first by (cbn in Hrk; lia).
-         destruct (IHrk _ _ _ _ P1_2 Q1) as [Q2 [HQ2cut HQ2val]] => //;
-           first by (cbn in Hrk; lia).
-         rewrite -catA. exists Q2. split => //=. 
-         eapply le_trans; last by apply HQ2val. 
-         rewrite (muleC _ (Ovalidity P1_2)%:num) -muleA. 
-         by apply: lee_pmul.
-     + move: P2 Hcf2 IHsz => /=.
-       rewrite -(cat0s (_ :: _)) cat_two_cons_cat_lift cat0s => P2 Hcf2 IHsz.
-       destruct (IHsz _ _ _ _ P1 P2) as [Q [HQcut HQval]] => //=; first by lia.
-       by exists (Opar _ _ _ Q).
+  - (* Opar *) 
+    destruct Σ as [| D Σ]; inversion HeqΣAΔ; subst.
+    + remember ((B ⊗* C) `* :: Γ) as BCΓ. 
+      destruct_Oprv P1 Σ Σ' Δ' D E P1_1 P1_2 P1; try inversion HeqBCΓ.
+      * have -> /=: D = B ⊗* C by rewrite (neg_involutive D) (neg_involutive (B ⊗* C)) H0.
+        rewrite mul1e => /=. exists (Opar _ _ _ P2). by split.
+      * exists (OEFQ _) => /=. rewrite mul0e. by split.
+      * done.
+      * simpl. destruct Hcf1. 
+        pose P := Opar _ _ _ P2. 
+        apply (cut_adm_mix_switch_case _ _ IHsz HeqBCΓ P1_1 P1_2 P) => //=.
+        by lia.
+      * pose P := Opar _ _ _ P2.
+        apply (cut_adm_exch_switch_case _ _ IHsz HeqBCΓ P1 P) => //=.
+        by lia.
+      * subst. destruct Hcf1 as [Hcf1_1 Hcf1_2]. 
+        move: P2 Hcf2 IHsz => /=. rewrite -(cat0s (_::_::_)) => P2 Hcf2 IHzs. 
+        destruct (IHrk _ _ _ _ P1_1 P2) as [Q1 [HQ1cut HQ1val]] => //;
+          first by (cbn in Hrk; lia).
+        destruct (IHrk _ _ _ _ P1_2 Q1) as [Q2 [HQ2cut HQ2val]] => //;
+          first by (cbn in Hrk; lia).
+        rewrite -catA. exists Q2. split => //=. 
+        eapply le_trans; last by apply HQ2val. 
+        rewrite (muleC _ (Ovalidity P1_2)%:num) -muleA. 
+        by apply: lee_pmul.
+    + move: P2 Hcf2 IHsz => /=.
+      rewrite -(cat0s (_ :: _)) cat_two_cons_cat_lift cat0s => P2 Hcf2 IHsz.
+      destruct (IHsz _ _ _ _ P1 P2) as [Q [HQcut HQval]] => //=; first by lia.
+      by exists (Opar _ _ _ Q).
   - (* Oone *)
     destruct Σ as [| B Σ]; inversion HeqΣAΔ; subst.
     + remember (𝟙 `* :: Γ) as OneΓ. 
@@ -579,185 +545,22 @@ Proof.
       rewrite harmonic_p_sum_mulDr //.
       by apply: harmonic_p_sum_both_monotone. 
   - (* Otop *)
-Admitted.
+    destruct Σ as [| D Σ]; inversion HeqΣAΔ; subst.
+    + remember (⊤ `* :: Γ) as HTΓ.
+      destruct_Oprv P1 Σ Σ' Δ' D E P1_1 P1_2 P1; try inversion HeqHTΓ.
+      * have -> /=: D = ⊥ `* by rewrite -H0 -neg_involutive.
+        exists (Otop _). split => //=. by rewrite mul1e.
+      * exists (OEFQ _). split => //=. by rewrite mul0e.
+      * done.
+      * destruct Hcf1 as [Hcf1_1 Hcf1_2].
+        apply (cut_adm_mix_switch_case  _ _ IHsz HeqHTΓ P1_1 P1_2 (Otop Δ)) => //=.
+        by lia.
+      * apply (cut_adm_exch_switch_case  _ _ IHsz HeqHTΓ P1 (Otop Δ)) => //=.
+        by lia.
+    + have [Heq0|Hneq0] := eqVneq (Ovalidity P1)%:num 0.
+      * exists (OEFQ _). split => //=. by rewrite Heq0 mul0e.
+      * exists (Otop _). split => //=. rewrite gt0_muley //.
+        rewrite lt0e. apply/andP. by split.
+Qed.
+
 End cut_elim.
-
-
-
-(* Obsolote code, remove soon *)
-
-Fixpoint pf_depth {Γ Δ: list (@qll_formula R p atoms)} (P: Γ ⊢ Δ) := match P with
-  | AX _ => True
-  | EMP => True
-  | EFQ _ _ => True
-  | CUT _ _ _ _ _ P1 P2 => max (pf_depth P1) (pf_depth P2) + 1
-  | MIX_star _ _ _ _ P1 P2 => max (pf_depth P1) (pf_depth P2) + 1
-  | tensor_L _ _ _ _ P => pf_depth P + 1
-  | tensor_R _ _ _ _ _ _ P1 P2 => max (pf_depth P1) (pf_depth P2) + 1
-  | par_L _ _ _ _ _ _ P1 P2 => max (pf_depth P1) (pf_depth P2) + 1
-  | par_R _ _ _ _ P => pf_depth P + 1
-  | one_L => 1
-  | one_R => 1
-  | neg_L _ _ _ P => pf_depth P + 1
-  | neg_R _ _ _ P => pf_depth P + 1
-  | or_L _ _ _ _ P1 P2 => max (pf_depth P1) (pf_depth P2) + 1
-  | or_R _ _ _ _ P1 P2 => max (pf_depth P1) (pf_depth P2) + 1
-  | and_L _ _ _ _ P1 P2 => max (pf_depth P1) (pf_depth P2) + 1
-  | and_R _ _ _ _ P1 P2 => max (pf_depth P1) (pf_depth P2) + 1
-  | bot_L => 1
-  | top_R => 1
-  | EXCH_L _ _ _ _ _ P => pf_depth P + 1
-  | EXCH_R _ _ _ _ _ P => pf_depth P + 1
-  end.
-
-Fixpoint cut_count {Γ Δ: list (@qll_formula R p atoms)} (P: Γ ⊢ Δ) := match P with
-  | AX _ => 0
-  | EMP => 0
-  | EFQ _ _ => 0
-  | CUT _ _ _ _ _ P1 P2 => cut_count P1 + cut_count P2 + 1
-  | MIX_star _ _ _ _ P1 P2 => cut_count P1 + cut_count P2
-  | tensor_L _ _ _ _ P => cut_count P
-  | tensor_R _ _ _ _ _ _ P1 P2 => cut_count P1 + cut_count P2
-  | par_L _ _ _ _ _ _ P1 P2 => cut_count P1 + cut_count P2
-  | par_R _ _ _ _ P => cut_count P
-  | one_L => 0
-  | one_R => 0
-  | neg_L _ _ _ P => cut_count P
-  | neg_R _ _ _ P => cut_count P
-  | or_L _ _ _ _ P1 P2 => cut_count P1 + cut_count P2
-  | or_R _ _ _ _ P1 P2 => cut_count P1 + cut_count P2
-  | and_L _ _ _ _ P1 P2 => cut_count P1 + cut_count P2
-  | and_R _ _ _ _ P1 P2 => cut_count P1 + cut_count P2
-  | bot_L => 0
-  | top_R => 0
-  | EXCH_L _ _ _ _ _ P => cut_count P
-  | EXCH_R _ _ _ _ _ P => cut_count P
-  end.
-
-(* A proof is cut-free if it contains 0 applications of cut *)
-Definition cut_free {Γ Δ} (P: Γ ⊢ Δ) := cut_count P = 0.
-
-Fixpoint max_cut_rank {Γ Δ: list (@qll_formula R p atoms)} (P: Γ ⊢ Δ) := match P with
-  | AX _ => 0
-  | EMP => 0
-  | EFQ _ _ => 0
-  | CUT A _ _ _ _ P1 P2 => max (fm_rank A) (max (max_cut_rank P1) (max_cut_rank P2))
-  | MIX_star _ _ _ _ P1 P2 => max (max_cut_rank P1) (max_cut_rank P2)
-  | tensor_L _ _ _ _ P => max_cut_rank P
-  | tensor_R _ _ _ _ _ _ P1 P2 => max (max_cut_rank P1) (max_cut_rank P2)
-  | par_L _ _ _ _ _ _ P1 P2 => max (max_cut_rank P1) (max_cut_rank P2)
-  | par_R _ _ _ _ P => max_cut_rank P
-  | one_L => 0
-  | one_R => 0
-  | neg_L _ _ _ P => max_cut_rank P
-  | neg_R _ _ _ P => max_cut_rank P
-  | or_L _ _ _ _ P1 P2 => max (max_cut_rank P1) (max_cut_rank P2)
-  | or_R _ _ _ _ P1 P2 => max (max_cut_rank P1) (max_cut_rank P2)
-  | and_L _ _ _ _ P1 P2 => max (max_cut_rank P1) (max_cut_rank P2)
-  | and_R _ _ _ _ P1 P2 => max (max_cut_rank P1) (max_cut_rank P2)
-  | bot_L => 0
-  | top_R => 0
-  | EXCH_L _ _ _ _ _ P => max_cut_rank P
-  | EXCH_R _ _ _ _ _ P => max_cut_rank P
-  end.
-
-Fixpoint num_cut_rank {Γ Δ: list (@qll_formula R p atoms)} r (P: Γ ⊢ Δ) := match P with
-  | AX _ => 0
-  | EMP => 0
-  | EFQ _ _ => 0
-  | CUT A _ _ _ _ P1 P2 => (if r == fm_rank A then 1 else 0) + num_cut_rank r P1 + num_cut_rank r P2
-  | MIX_star _ _ _ _ P1 P2 => num_cut_rank r P1 + num_cut_rank r P2
-  | tensor_L _ _ _ _ P => num_cut_rank r P
-  | tensor_R _ _ _ _ _ _ P1 P2 => num_cut_rank r P1 + num_cut_rank r P2
-  | par_L _ _ _ _ _ _ P1 P2 => num_cut_rank r P1 + num_cut_rank r P2
-  | par_R _ _ _ _ P => num_cut_rank r P
-  | one_L => 0
-  | one_R => 0
-  | neg_L _ _ _ P => num_cut_rank r P
-  | neg_R _ _ _ P => num_cut_rank r P
-  | or_L _ _ _ _ P1 P2 => num_cut_rank r P1 + num_cut_rank r P2
-  | or_R _ _ _ _ P1 P2 => num_cut_rank r P1 + num_cut_rank r P2
-  | and_L _ _ _ _ P1 P2 => num_cut_rank r P1 + num_cut_rank r P2
-  | and_R _ _ _ _ P1 P2 => num_cut_rank r P1 + num_cut_rank r P2
-  | bot_L => 0
-  | top_R => 0
-  | EXCH_L _ _ _ _ _ P => num_cut_rank r P
-  | EXCH_R _ _ _ _ _ P => num_cut_rank r P
-  end.
-
-Definition num_max_cut_rank {Γ Δ: list (@qll_formula R p atoms)} (P: Γ ⊢ Δ) := num_cut_rank (max_cut_rank P) P.
-
-Fixpoint cut_depths_sum {Γ Δ: list (@qll_formula R p atoms)} (P: Γ ⊢ Δ) := match P with
-  | AX _ => 0
-  | EMP => 0
-  | EFQ _ _ => 0
-  | CUT A _ _ _ _ P1 P2 => cut_depths_sum P1 + cut_depths_sum P2 + pf_depth P
-  | MIX_star _ _ _ _ P1 P2 => cut_depths_sum P1 + cut_depths_sum P2
-  | tensor_L _ _ _ _ P => cut_depths_sum P
-  | tensor_R _ _ _ _ _ _ P1 P2 => cut_depths_sum P1 + cut_depths_sum P2
-  | par_L _ _ _ _ _ _ P1 P2 => cut_depths_sum P1 + cut_depths_sum P2
-  | par_R _ _ _ _ P => cut_depths_sum P
-  | one_L => 0
-  | one_R => 0
-  | neg_L _ _ _ P => cut_depths_sum P
-  | neg_R _ _ _ P => cut_depths_sum P
-  | or_L _ _ _ _ P1 P2 => cut_depths_sum P1 + cut_depths_sum P2
-  | or_R _ _ _ _ P1 P2 => cut_depths_sum P1 + cut_depths_sum P2
-  | and_L _ _ _ _ P1 P2 => cut_depths_sum P1 + cut_depths_sum P2
-  | and_R _ _ _ _ P1 P2 => cut_depths_sum P1 + cut_depths_sum P2
-  | bot_L => 0
-  | top_R => 0
-  | EXCH_L _ _ _ _ _ P => cut_depths_sum P
-  | EXCH_R _ _ _ _ _ P => cut_depths_sum P
-  end.
-
-Definition cut_elim_order {Γ Δ: list (@qll_formula R p atoms)} (P Q: Γ ⊢ Δ) :=
-  four_lex_explicit lt lt lt lt (max_cut_rank P, num_max_cut_rank P, cut_count P, cut_depths_sum P)
-     (max_cut_rank Q, num_max_cut_rank Q, cut_count Q, cut_depths_sum Q).
-
-Lemma cut_elim_order_wf {Γ Δ: list (@qll_formula R p atoms)}:
-  well_founded (@cut_elim_order Γ Δ).
-Proof.
-  unfold cut_elim_order.
-  pose H := (well_founded_retract _ (fun P => (max_cut_rank P, num_max_cut_rank P, cut_count P, cut_depths_sum P)) well_founded_nat_quadruple).
-  by apply H.
-Defined. 
-
-End size_functions.
-
-
-Section elimination_lemmas.
-
-Context {R: realType}.
-Context {p: {nonneg \bar R}}.
-Context {atoms: Type}.
-
-Open Scope list_scope.
-Open Scope ereal_scope.
-Open Scope nngereal_scope.
-Open Scope qll_calculus.
-
-(** ** Structural Rules *)
-
-Lemma AX_vs_hypothesis {Γ Δ: list (@qll_formula R p atoms)} {A} (P: A::Γ ⊢ Δ):
-  (exists Q, P = CUT A [A] Γ [] Δ (AX A) Q)
-  -> exists Q: A::Γ ⊢ Δ, validity Q = validity P /\ (cut_count Q < cut_count P)%N.
-Proof. 
-  move=> [Q ->]. exists Q => /=. split; last by lia.
-  apply/val_inj => /=. by rewrite mul1e.
-Defined.
-
-Lemma tst {Γ Δ: list (@qll_formula R p atoms)} (P: Γ ⊢ Δ):
-  False.
-Proof.
-  destruct P.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - 
-
-
-
-
-End elimination_lemmas.
