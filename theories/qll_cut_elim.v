@@ -177,7 +177,9 @@ Tactic Notation "exch_inv_tac" hyp(H) :=
 Lemma cat_cons_inv {X} (Σ Γ Δ: list X) A:
   Σ ++ Δ = A::Γ -> {Σ' & (A::Σ' = Σ)%SEQ} + (Σ = [] /\ Δ = A::Γ).
 Proof.
-Admitted.
+  destruct Σ as [| B Σ] => /= HΣΔ; first by right; split.
+  inversion HΣΔ; first by left; exists Σ.
+Qed.
 
 Lemma list_elem_list_emp_inv {X} (Σ Γ: list X) A:
   [] = (Σ ++ A :: Γ) -> False.
