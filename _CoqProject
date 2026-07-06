@@ -4,4 +4,3 @@ theories/interval_einference.v
 theories/nonneg_ereal.v
 theories/qll_core.v
 theories/wf_rec.v
-theories/List_more.v

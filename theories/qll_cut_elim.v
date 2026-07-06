@@ -3,7 +3,7 @@ From Stdlib Require Import List Wf_nat.
 From mathcomp Require Import all_boot all_order ssralg ssrint ssrnum.
 From mathcomp Require Import reals constructive_ereal classical_sets ereal zify.
 
-From QLLib Require Import qll_core wf_rec nonneg_ereal List_more.
+From QLLib Require Import qll_core nonneg_ereal.
 
 Import Order.TTheory.
 
@@ -142,7 +142,7 @@ Lemma exch_inv X (Γ Δ Γ' Δ': list X) (A B C: X):
   + (Δ = C::Δ' /\ A = B /\ Γ = Γ')%SEQ.
 Proof.
   induction Γ as [|D Γ IHΓ] in Γ' |-*;
-  destruct Γ' as [| E Γ']; simpl; move => Heq.
+  destruct Γ' as [|E Γ']; simpl; move => Heq.
   - right. inversion Heq. by repeat split => //.
   - left. left. right. inversion Heq. by exists Γ'.
   - inversion Heq; subst. destruct Γ as [| D Γ].
@@ -156,22 +156,22 @@ Proof.
     + right. subst. done.
 Qed.
 
-#[local] Ltac exch_inv_exec_core H p :=
+#[local] Ltac exch_inv_tac_impl H p :=
   match type of H with
   | cat _ (cons _ _) = cat _ (cons _ (cons _ _)) => apply exch_inv in H as p
   | (cat _ (cons _ (cons _ _))) = (cat _ (cons _ _)) => symmetry in H;
                                       apply exch_inv in H as p
-  | _ => idtac "k"                                                           
+  | _ => idtac "Error"                                                           
   end.
 
-Tactic Notation "exch_inv_tac" hyp(H) "as" simple_intropattern(p) := exch_inv_exec_core H p.
+Tactic Notation "exch_inv_tac" hyp(H) "as" simple_intropattern(p) := exch_inv_tac_impl H p.
 Tactic Notation "exch_inv_tac" hyp(H) :=
   let Σ := fresh "Σ" in
   let Σ' := fresh "Σ'" in
   let H1 := fresh H in
   let H2 := fresh H in
   let H3 := fresh H in
-  exch_inv_exec_core H ipattern:([[[[Σ [H1 H2]]|[Σ [H1 H2]]]|[H1 [H2 H3]]]|[H1 [H2 H3]]]).
+  exch_inv_tac_impl H ipattern:([[[[Σ [H1 H2]]|[Σ [H1 H2]]]|[H1 [H2 H3]]]|[H1 [H2 H3]]]).
 
 
 Lemma cat_cons_inv {X} (Σ Γ Δ: list X) A:
@@ -187,6 +187,35 @@ Proof.
   move => H.
   by induction Σ; inversion H.
 Qed.
+
+Lemma cat_cons_cat_inv {X} (Σ Γ Σ' Γ': list X) A:
+  Σ ++ A::Γ = Σ' ++ Γ' ->
+  {Δ & (Σ' = Σ ++ A::Δ /\ Γ = Δ ++ Γ')%SEQ}
+  + {Δ & (Γ' = Δ ++ A::Γ /\ Σ = Σ' ++ Δ)%SEQ}.
+Proof.
+  induction Σ as [|B Σ IHΣ] in Σ' |-*; destruct Σ' as [|C Σ'] => /= Heq.
+  - right. by exists [].
+  - inversion Heq. subst. left. by exists Σ'.
+  - right. by exists (B::Σ).
+  - inversion Heq. destruct (IHΣ _ H1) as [[Δ [HΣ' HΓ]]|[Δ [HΓ' HΣ]]]; subst.
+    + left. by exists Δ.
+    + right. by exists Δ.
+Qed.
+
+#[local] Ltac cat_cons_cat_inv_tac_impl H p :=
+  match type of H with
+  | (_ ++ _ = _ ++ (_ :: _))%SEQ => symmetry in H;
+                            apply cat_cons_cat_inv in H as p
+  | (_ ++ (_ :: _) = _ ++ _)%SEQ => apply cat_cons_cat_inv in H as p
+  | _ => idtac "Error"                                                           
+  end.
+
+Tactic Notation "cat_cons_cat_inv_tac" hyp(H) "as" simple_intropattern(p) := cat_cons_cat_inv_tac_impl H p.
+Tactic Notation "cat_cons_cat_inv_tac" hyp(H) :=
+  let Σ := fresh "Σ" in
+  let H1 := fresh H in
+  let H2 := fresh H in
+  cat_cons_cat_inv_tac_impl H ipattern:([[Σ [H1 H2]]|[Σ [H1 H2]]]).
 
 Definition IH_form_rk (rk: nat) := forall Σ Γ Δ A (P1: ⊢O A `*::Γ) (P2: ⊢O Σ ++ A::Δ),
    (fm_rank A < rk)%coq_nat ->
@@ -274,7 +303,7 @@ Lemma cut_adm_mix_case {Σ Γ Δ Σ' Γ' A} sz rk:
     ((Ovalidity P1 ⊗ Ovalidity (OMIX _ _ P2_1 P2_2))%NNGE)%:num <= (Ovalidity Q)%:num.
 Proof.
   rewrite /IH_proof_sz => IHsz Heq P1 P2_1 P2_2 Hcf1 Hcf2_1 Hcf2_2 Hsz Hrk /=.
-  dichot_elt_app_inf_exec Heq; subst. 
+  cat_cons_cat_inv_tac Heq; subst. 
   - specialize (IHsz Σ Γ Σ0 A P1 P2_1).
     destruct IHsz as [Q [Hcf HQval]] => //=; first by lia.
     rewrite catA catA -(catA Σ _ _). exists (OMIX _ _ Q P2_2).
@@ -359,7 +388,7 @@ Proof.
     by rewrite (muleC (Ovalidity P2_2)%:num _) (muleC (Ovalidity P1_1)%:num _).
 Qed.
 
-Lemma cut_admissibility {Σ Γ Δ: list (@qll_formula R p atoms)} A:
+Theorem cut_admissibility {Σ Γ Δ: list (@qll_formula R p atoms)} A:
   forall P1: ⊢O A `*::Γ, forall P2: ⊢O Σ ++ A::Δ, cut_free P1 -> cut_free P2 ->
     exists Q: ⊢O Σ ++ Γ ++ Δ, cut_free Q /\ ((Ovalidity P1 ⊗ Ovalidity P2)%NNGE <= Ovalidity Q)%O.
 Proof.
@@ -424,7 +453,7 @@ Proof.
         rewrite catA -(cat0s ((Γ ++ Γ') ++ Δ')). exists Q2. split => //.
         eapply le_trans; last exact HQ2val. rewrite muleA.
         by apply: (lee_pmul _ _ HQ1val _) => //.
-    + dichot_elt_app_inf_exec H1; subst; destruct Hcf2 as [Hcf2_1 Hcf2_2] => /=.
+    + cat_cons_cat_inv_tac H1; subst; destruct Hcf2 as [Hcf2_1 Hcf2_2] => /=.
       * destruct (IHsz (B::Σ) _ _ _ P1 P2_1) as [Q [HQcut HQval]] => //=; first by lia.
         rewrite catA catA -(catA Σ). 
         exists (Otensor _ _ (Σ ++ Γ ++ Σ0) _ Q P2_2). split => //=.
