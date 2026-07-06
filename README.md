@@ -1,6 +1,6 @@
 # Towards a Library of Quantitative Logics in Rocq
 
-This repository contains the Rocq code accompanying the Rocqshop 2026 submission by[Janis Bailitis, Reynald Affeldt, Alessandro Bruni, Alessio Coltelacci, Ekaterina Komendantskaya, and Kathrin Stark titled "Towards a Library of Quantitative Logics in Rocq"
+This repository contains the Rocq code accompanying the Rocqshop 2026 submission by Janis Bailitis, Reynald Affeldt, Alessandro Bruni, Alessio Coltelacci, Ekaterina Komendantskaya, and Kathrin Stark titled "Towards a Library of Quantitative Logics in Rocq"
 
 RocqDoc documentation can be found [here](https://janis-bai.github.io/QLLib/Rocqshop_2026/toc.html).
 
@@ -12,7 +12,7 @@ The mechanisation consists of the following files:
 
 ## Compilation Instructions
 
-The code has been tested on Rocq `9.1`, compiled with OCaml `4.14.2`. It requires [MathComp](https://github.com/math-comp/math-comp), [MathComp-analysis](https://github.com/math-comp/analysis), and [MathComp-finmap](https://github.com/math-comp/finmap)
+The code has been tested on Rocq `9.1`, compiled with OCaml `4.14.2`. It requires [MathComp](https://github.com/math-comp/math-comp), [MathComp-analysis](https://github.com/math-comp/analysis), and [MathComp-finmap](https://github.com/math-comp/finmap).
 
 Installing the following components via `opam` should be sufficient to compile the code:
 ```
