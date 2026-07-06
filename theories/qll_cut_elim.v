@@ -17,6 +17,9 @@ Context {atoms: Type}.
 
 Open Scope qll_calculus.     
 
+(** * Cut Elimination Proof for pQLL *)
+(** ** Fundamental Definitions *)
+(** Rank of a formula (i.e. number of connectives in a formula) *)
 Fixpoint fm_rank (form: @qll_formula R p atoms) := match form with
   | atom _ | neg_atom _ | 𝟙 | ⊥ | ⊤  => 1
   | A ⊗ B | (A ⊗* B) | A ∧[_] B | A ∨[_] B => fm_rank A + fm_rank B + 1
@@ -28,6 +31,7 @@ Proof.
   by induction A as [a | a | | | | [| | |] A IHA B IHB] => //=; rewrite IHA IHB.
 Qed.
 
+(** Size of proofs *)
 Fixpoint pf_size {Γ: list (@qll_formula R p atoms)} (P: ⊢O Γ) := match P with
   | OAX _ => 1
   | OEMP => 1
@@ -43,6 +47,7 @@ Fixpoint pf_size {Γ: list (@qll_formula R p atoms)} (P: ⊢O Γ) := match P wit
   | Otop _ => 1
   end.
 
+(** Cut-freeness of proofs in the single-sided calculus for pQLL *)
 Fixpoint cut_free {Γ: list (@qll_formula R p atoms)} (P: ⊢O Γ) := match P with
   | OAX _ => True
   | OEMP => True
@@ -61,6 +66,7 @@ end.
 Open Scope ring_scope.
 Open Scope ereal_scope.
 
+(** * Needed Lemmas on Lists and Decuction in pQLL *)
 Lemma cat_cons_eq_cat_cat X (Γ Σ: list X) A:
   (Γ ++ A::Σ = (Γ ++ [A]) ++ Σ)%SEQ.
 Proof.
@@ -158,8 +164,8 @@ Qed.
 
 #[local] Ltac exch_inv_tac_impl H p :=
   match type of H with
-  | cat _ (cons _ _) = cat _ (cons _ (cons _ _)) => apply exch_inv in H as p
-  | (cat _ (cons _ (cons _ _))) = (cat _ (cons _ _)) => symmetry in H;
+  | _ ++ _ :: _ =  _ ++  _ :: _ :: _ => apply exch_inv in H as p
+  | _ ++ _ :: _ :: _ = _ ++ _ :: _ => symmetry in H;
                                       apply exch_inv in H as p
   | _ => idtac "Error"                                                           
   end.
@@ -204,9 +210,9 @@ Qed.
 
 #[local] Ltac cat_cons_cat_inv_tac_impl H p :=
   match type of H with
-  | (_ ++ _ = _ ++ (_ :: _))%SEQ => symmetry in H;
+  | _ ++ _ = _ ++ _ :: _ => symmetry in H;
                             apply cat_cons_cat_inv in H as p
-  | (_ ++ (_ :: _) = _ ++ _)%SEQ => apply cat_cons_cat_inv in H as p
+  | _ ++ _ :: _ = _ ++ _ => apply cat_cons_cat_inv in H as p
   | _ => idtac "Error"                                                           
   end.
 
@@ -217,6 +223,7 @@ Tactic Notation "cat_cons_cat_inv_tac" hyp(H) :=
   let H2 := fresh H in
   cat_cons_cat_inv_tac_impl H ipattern:([[Σ [H1 H2]]|[Σ [H1 H2]]]).
 
+(** ** Inductive Hypotheses for Cut Admissibility Proof *)
 Definition IH_form_rk (rk: nat) := forall Σ Γ Δ A (P1: ⊢O A `*::Γ) (P2: ⊢O Σ ++ A::Δ),
    (fm_rank A < rk)%coq_nat ->
    cut_free P1 -> cut_free P2 ->
@@ -230,6 +237,7 @@ Definition IH_proof_sz (sz rk: nat) := forall Σ Γ Δ A (P1: ⊢O A `*::Γ) (P2
    exists Q:  ⊢O Σ ++ Γ ++ Δ, cut_free Q /\
    ((Ovalidity P1 ⊗ Ovalidity P2)%NNGE%:num <= (Ovalidity Q)%:num)%O.
 
+(** ** Cut Admissibility *)
 (* We need rk as parameter here:
 were we to instantiate IH_proof_sz with (fm_rank A) instead of rk
 this lemma would still be provable (with the same proof), but using it in
