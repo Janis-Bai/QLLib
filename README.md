@@ -1,6 +1,6 @@
 # Towards a Library of Quantitative Logics in Rocq
 
-This repository contains the Rocq code accompanying the Rocqshop 2026 submission by Janis Bailitis, Reynald Affeldt, Alessandro Bruni, Alessio Coltelacci, Ekaterina Komendantskaya, and Kathrin Stark titled "Towards Quantitative Logics in Rocq".
+This repository contains the Rocq code accompanying the Rocqshop 2026 submission by Janis Bailitis, Reynald Affeldt, Alessandro Bruni, Alessio Coltellacci, Ekaterina Komendantskaya, and Kathrin Stark titled "Towards Quantitative Logics in Rocq".
 
 RocqDoc documentation can be found [here](https://janis-bai.github.io/QLLib/Rocqshop_2026/toc.html).
 
