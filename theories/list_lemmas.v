@@ -107,3 +107,7 @@ Tactic Notation "cat_cons_cat_inv_tac" hyp(H) :=
   let H1 := fresh H in
   let H2 := fresh H in
   cat_cons_cat_inv_tac_impl H ipattern:([[Σ [H1 H2]]|[Σ [H1 H2]]]).
+
+Lemma cat_cons_comm X (Σ Γ: list X) A:
+  (A :: Σ ++ Γ = (A :: Σ) ++ Γ)%SEQ.
+Proof. by []. Qed.

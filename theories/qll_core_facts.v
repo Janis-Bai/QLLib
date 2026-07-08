@@ -48,10 +48,6 @@ Context {atoms: Type}.
 
 Open Scope qll_calculus.
 
-Lemma cat_cons_comm X (Σ Γ: list X) A:
-  (A :: Σ ++ Γ = (A :: Σ) ++ Γ)%SEQ.
-Proof. by []. Qed.
-
 (** ** Exchange lemmas for once-sided calculus *)
 Lemma Olist_form_exch_l {Γ Σ Δ: list (@qll_formula R p atoms)} {A}:
   forall P: ⊢O Σ ++ A::Γ ++ Δ, exists Q: ⊢O Σ ++ Γ ++ A::Δ,
