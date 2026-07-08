@@ -192,6 +192,12 @@ Proof.
   by rewrite /comulnnge invnnge_involutive.
 Qed.
 
+Lemma mulnngeC (a b: {nonneg \bar R}):
+  a ⊗ b = b ⊗ a.
+Proof.
+  apply/val_inj => /=. by rewrite muleC.
+Qed.
+
 Lemma mul0nng (a b: {nonneg \bar R}):
   a%:num = 0 -> a ⊗ b = 0%:E%:nng.
 Proof.
@@ -204,6 +210,12 @@ Lemma mulnng0 (a b: {nonneg \bar R}):
 Proof.
   move=> Hb. apply /val_inj => /=.
   by rewrite Hb mule0.
+Qed.
+
+Lemma comulnngeC (a b: {nonneg \bar R}):
+  a ⊗* b = b ⊗* a.
+Proof.
+  by rewrite /comulnnge mulnngeC.
 Qed.
 
 Lemma comulynng (a b: {nonneg \bar R}):

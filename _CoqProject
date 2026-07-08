@@ -2,5 +2,7 @@
 
 theories/interval_einference.v
 theories/nonneg_ereal.v
-theories/qll_core.v
-theories/qll_cut_elim.v
+theories/list_lemmas.v
+theories/qll_defs.v
+theories/qll_core_facts.v
+
