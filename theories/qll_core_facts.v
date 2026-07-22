@@ -10,6 +10,9 @@ From Stdlib Require Import List Permutation.
 
 Import ListNotations.
 
+(* Restore mathcomp's seq := list, shadowed by Stdlib's List.seq *)
+Notation seq := list.
+
 Section basic_facts.
 
 Context {R: realType}.
@@ -28,10 +31,10 @@ Lemma neg_involutive (form: @qll_formula R p atoms):
 Proof.
   by induction form as [a | a | | | | [| | |] A IHA B IHB] => //=;
   cbn; rewrite -IHA -IHB.
-Qed.
+Defined.
 
-Lemma proof_le_provability {A} {B} P:
-  (@validity R p atoms A B P)%:num <= provability A B.
+Lemma proof_le_provability {T: @qll_theory R p atoms} {A} {B} (P: @prv R p atoms T A B):
+  (validity P)%:num <= @provability R p atoms T A B.
 Proof.
   apply le_ereal_sup_tmp. exists ((validity P)%:nngnum) => //.
   rewrite /provability_set /=. by exists P.
@@ -48,119 +51,137 @@ Context {atoms: Type}.
 
 Open Scope qll_calculus.
 
-(** ** Exchange lemmas for once-sided calculus *)
+(** The whole section is parametric in a two-sided theory T and a
+    one-sided theory OT: locally, ⊢ means ⊢[T] and ⊢O means ⊢O[OT], so
+    the lemmas specialise to the empty-theory statements at T = OT = set0
+    and are shared with theories such as the grounded ones. *)
+Context {T: @qll_theory R p atoms}.
+Context {OT: @Oqll_theory R p atoms}.
+
+Local Notation "A ⊢ B" := (@prv R p atoms T A B) (at level 61): qll_calculus.
+Local Notation "⊢O Γ" := (@Oprv R p atoms OT Γ) (at level 61): qll_calculus.
+
+
+(** ** Exchange lemmas for one-sided calculus *)
 Lemma Olist_form_exch_l {Γ Σ Δ: list (@qll_formula R p atoms)} {A}:
-  forall P: ⊢O Σ ++ A::Γ ++ Δ, exists Q: ⊢O Σ ++ Γ ++ A::Δ,
-    Ovalidity P = Ovalidity Q /\ Ocut_free P = Ocut_free Q.
+  forall P: ⊢O Σ ++ A::Γ ++ Δ, {Q: ⊢O Σ ++ Γ ++ A::Δ |
+    Ovalidity P = Ovalidity Q /\ Ocut_free P = Ocut_free Q}.
 Proof.
   induction Γ as [| B Γ IHΓ] in Σ |-*; simpl.
   - move => P. by exists P.
   - move => P. rewrite cat_cons_eq_cat_cat.
     pose P' := (OEXCH _ _ _ _ P).
-    have ->: Ovalidity P = Ovalidity P' by done.
-    have ->: Ocut_free P = Ocut_free P' by done.
+    (* ssr's have seals the proof term behind the Qed-opaque ssr_have_upoly
+       in Type-valued goals, blocking the reduction of the witness; the
+       stdlib assert is a transparent cut (idem below) *)
+    assert (Hval: Ovalidity P = Ovalidity P') by done.
+    assert (Hcut: Ocut_free P = Ocut_free P') by done.
+    rewrite {}Hval {}Hcut.
     move: P'. rewrite cat_cons_eq_cat_cat => P'.
     destruct (IHΓ _ P') as [Q [HQval HQcut]].  exists Q. by split.
-Qed.
+Defined.
 
 Lemma Olist_form_form_exch_l {Γ Σ Δ: list (@qll_formula R p atoms)} {A B}:
-  forall P: ⊢O Σ ++ A::B::Γ ++ Δ, exists Q: ⊢O Σ ++ Γ ++ A::B::Δ,
-    Ovalidity P = Ovalidity Q /\ Ocut_free P = Ocut_free Q.
+  forall P: ⊢O Σ ++ A::B::Γ ++ Δ, {Q: ⊢O Σ ++ Γ ++ A::B::Δ |
+    Ovalidity P = Ovalidity Q /\ Ocut_free P = Ocut_free Q}.
 Proof.
   move=> P. pose P' := OEXCH _ _ _ _ P.
-  have ->: Ovalidity P = Ovalidity P' by done.
-  have ->: Ocut_free P = Ocut_free P' by done.
+  assert (Hval: Ovalidity P = Ovalidity P') by done.
+  assert (Hcut: Ocut_free P = Ocut_free P') by done.
+  rewrite {}Hval {}Hcut.
   move: P'. rewrite cat_cons_comm. clear P => P.
   move: (Olist_form_exch_l P) => [Q [-> ->]].
   move: (Olist_form_exch_l Q) => [Q' [-> ->]]. clear P Q.
   by exists Q'.
-Qed. 
+Defined.
 
 Lemma Olist_form_exch_r {Γ Σ Δ: list (@qll_formula R p atoms)} {A}:
-  forall P: ⊢O Σ ++ Γ ++ A::Δ, exists Q: ⊢O Σ ++ A::Γ ++ Δ,
-    Ovalidity P = Ovalidity Q /\ Ocut_free P = Ocut_free Q.
+  forall P: ⊢O Σ ++ Γ ++ A::Δ, {Q: ⊢O Σ ++ A::Γ ++ Δ |
+    Ovalidity P = Ovalidity Q /\ Ocut_free P = Ocut_free Q}.
 Proof.
   induction Γ as [| B Γ IHΓ] in Σ |-*; simpl.
   - move => P. by exists P.
-  - move => P. suff [Q [-> ->]]: exists Q: ⊢O Σ ++ B::A::(Γ ++ Δ),
-      Ovalidity P = Ovalidity Q /\ Ocut_free P = Ocut_free Q
-      by exists (OEXCH _ _ _ _ Q).
+  - move => P.
+    enough ({Q: ⊢O Σ ++ B::A::(Γ ++ Δ) |
+      Ovalidity P = Ovalidity Q /\ Ocut_free P = Ocut_free Q}) as [Q [-> ->]];
+      first by exists (OEXCH _ _ _ _ Q).
    rewrite cat_cons_eq_cat_cat.
-   move: P. rewrite cat_cons_eq_cat_cat => P. 
+   move: P. rewrite cat_cons_eq_cat_cat => P.
    by apply IHΓ.
-Qed.
+Defined.
 
 Lemma Olist_form_form_exch_r {Γ Σ Δ: list (@qll_formula R p atoms)} {A B}:
-  forall P: ⊢O Σ ++ Γ ++ A::B::Δ, exists Q: ⊢O Σ ++ A::B::Γ ++ Δ,
-    Ovalidity P = Ovalidity Q /\ Ocut_free P = Ocut_free Q.
+  forall P: ⊢O Σ ++ Γ ++ A::B::Δ, {Q: ⊢O Σ ++ A::B::Γ ++ Δ |
+    Ovalidity P = Ovalidity Q /\ Ocut_free P = Ocut_free Q}.
 Proof.
   move => P.
-  move: (Olist_form_exch_r P). rewrite cat_cons_comm. 
+  move: (Olist_form_exch_r P). rewrite cat_cons_comm.
   move => [Q [-> ->]].
   move: (Olist_form_exch_r Q) => /= [Q' [-> ->]]. clear P Q.
   by exists (OEXCH _ _ _ _ Q').
-Qed. 
+Defined.
 
 Lemma Olist_list_exch {Σ Γ Γ' Δ: list (@qll_formula R p atoms)}:
-  forall P: ⊢O Σ ++ Γ ++ Γ' ++ Δ, exists Q: ⊢O Σ ++ Γ' ++ Γ ++ Δ,
-    Ovalidity P = Ovalidity Q /\ Ocut_free P = Ocut_free Q.
+  forall P: ⊢O Σ ++ Γ ++ Γ' ++ Δ, {Q: ⊢O Σ ++ Γ' ++ Γ ++ Δ |
+    Ovalidity P = Ovalidity Q /\ Ocut_free P = Ocut_free Q}.
 Proof.
   induction Γ as [|A Γ IHΓ] in Γ' |-*; simpl; move => P; first by exists P.
-  destruct (Olist_form_exch_l P) as [Q1 [-> ->]]. 
+  destruct (Olist_form_exch_l P) as [Q1 [-> ->]].
   move: Q1. rewrite cat_cons_cat_lift -catA => Q1.
   destruct (IHΓ _ Q1) as [Q2 [-> ->]] => /=.
   destruct (Olist_form_exch_l Q2) as [Q3 [-> ->]].
   by exists Q3.
-Qed.
+Defined.
 
 Lemma Otwo_list_list_exch {Σ Γ: list (@qll_formula R p atoms)}:
-  forall P: ⊢O Σ ++ Γ, exists Q: ⊢O Γ ++ Σ,
-    Ovalidity P = Ovalidity Q /\ Ocut_free P = Ocut_free Q.
+  forall P: ⊢O Σ ++ Γ, {Q: ⊢O Γ ++ Σ |
+    Ovalidity P = Ovalidity Q /\ Ocut_free P = Ocut_free Q}.
 Proof.
-  have ->: (Σ ++ Γ = [] ++ Σ ++ Γ ++ [])%SEQ by rewrite cat0s cats0.
-  have ->: (Γ ++ Σ = [] ++ Γ ++ Σ ++ [])%SEQ by rewrite cat0s cats0.
-  by apply Olist_list_exch.
-Qed.
+  assert (H1: (Σ ++ Γ = [] ++ Σ ++ Γ ++ [])%SEQ). by rewrite cat0s cats0.
+  assert (H2: (Γ ++ Σ = [] ++ Γ ++ Σ ++ [])%SEQ). by rewrite cat0s cats0.
+  rewrite H1 H2. by apply Olist_list_exch.
+Defined.
 
 Lemma list_form_exch_rr {Γ Γ' Σ Δ: list (@qll_formula R p atoms)} {A}:
-  forall P: Γ' ⊢ Σ ++ Γ ++ A::Δ, exists Q: Γ' ⊢ Σ ++ A::Γ ++ Δ,
-    validity P = validity Q /\ cut_free P = cut_free Q.
+  forall P: Γ' ⊢ Σ ++ Γ ++ A::Δ, {Q: Γ' ⊢ Σ ++ A::Γ ++ Δ |
+    validity P = validity Q /\ cut_free P = cut_free Q}.
 Proof.
   induction Γ as [| B Γ IHΓ] in Σ |-*; simpl.
   - move=> P. by exists P.
   - rewrite cat_cons_eq_cat_cat => P.
-    move: (IHΓ _ P). rewrite -cat_cons_eq_cat_cat. 
+    move: (IHΓ _ P). rewrite -cat_cons_eq_cat_cat.
     move => [Q [-> ->]]. by exists (EXCH_R _ _ _ _ _ Q).
-Qed.
+Defined.
 
 Lemma list_form_exch_rl {Γ Γ' Σ Δ: list (@qll_formula R p atoms)} {A}:
-  forall P: Γ' ⊢ Σ ++ A::Γ ++ Δ, exists Q: Γ' ⊢ Σ ++ Γ ++ A::Δ,
-    validity P = validity Q /\ cut_free P = cut_free Q.
+  forall P: Γ' ⊢ Σ ++ A::Γ ++ Δ, {Q: Γ' ⊢ Σ ++ Γ ++ A::Δ |
+    validity P = validity Q /\ cut_free P = cut_free Q}.
 Proof.
   induction Γ as [| B Γ IHΓ] in Σ |-*; simpl.
   - move=> P. by exists P.
   - move=> P. pose P' := EXCH_R _ _ _ _ _ P.
-    have ->: cut_free P = cut_free P' by done.
-    have ->: validity P = validity P' by done.
-    move: P'. clear P. rewrite cat_cons_eq_cat_cat => P. 
-    move: (IHΓ _ P). rewrite -cat_cons_eq_cat_cat. 
+    assert (Hcut: cut_free P = cut_free P') by done.
+    assert (Hval: validity P = validity P') by done.
+    rewrite {}Hcut {}Hval.
+    move: P'. clear P. rewrite cat_cons_eq_cat_cat => P.
+    move: (IHΓ _ P). rewrite -cat_cons_eq_cat_cat.
     move => [Q [-> ->]]. by exists Q.
-Qed.
+Defined.
 
 Lemma list_list_exch_r {Γ Γ' Σ Σ' Δ: list (@qll_formula R p atoms)}:
-  forall P: Γ' ⊢ Σ ++ Σ' ++ Γ ++ Δ, exists Q: Γ' ⊢ Σ ++ Γ ++ Σ' ++ Δ,
-    validity P = validity Q /\ cut_free P = cut_free Q.
+  forall P: Γ' ⊢ Σ ++ Σ' ++ Γ ++ Δ, {Q: Γ' ⊢ Σ ++ Γ ++ Σ' ++ Δ |
+    validity P = validity Q /\ cut_free P = cut_free Q}.
 Proof.
   induction Γ as [| B Γ IHΓ] in Σ |-*; simpl.
   - move=> P. by exists P.
-  - move=> P. move: (list_form_exch_rr P). 
+  - move=> P. move: (list_form_exch_rr P).
     rewrite cat_cons_eq_cat_cat. move=> [Q [-> ->]].
     move: (IHΓ _ Q). rewrite -cat_cons_eq_cat_cat.
     move=> [Q' [-> ->]]. by exists Q'.
-Qed.
-(* TODO It would be nive to have a lemma as follows. 
+Defined.
+(* TODO It would be nice to have a lemma as follows.
    Sadly, in Permutation types, ++ is interpeted as app, whereas
-   here (due to using mathcomp), ++ is interpreted as cat 
+   here (due to using mathcomp), ++ is interpreted as cat
 Lemma perm_exch {Σ: list (@qll_formula R p atoms)}:
   forall P: ⊢O Σ, forall Σ', Permutation Σ Σ' -> exists Q: ⊢O Σ',
     Ovalidity P = Ovalidity Q /\ (Ocut_free P -> Ocut_free Q). *)
@@ -177,20 +198,33 @@ Lemma list_neg_catD Σ Γ:
 Proof.
   induction Σ as [| A Σ IHΣ] => //=.
   by rewrite IHΣ.
-Qed.
+Defined.
+
+(** The translations between the calculi relate the theories through two
+    hypotheses: every two-sided axiom has a one-sided counterpart with
+    the same bound (ax_compat), and every one-sided axiom is derivable —
+    cut-freely and with the exact bound as validity — on the two-sided
+    side (Oax_deriv). Both are trivially satisfied at set0. Oax_deriv
+    lands in Type so the returned derivation is extractable; its equations
+    are stated in the orientation used by the translation. *)
+Hypothesis ax_compat: forall ax, T ax ->
+  OT (mkOAxiom (ax_bound ax) (list_neg (ax_lhs ax) ++ ax_rhs ax)%SEQ).
+
+Hypothesis Oax_deriv: forall oax, OT oax ->
+  {Q: [] ⊢ Oax_seq oax | Oax_bound oax = validity Q /\ True = cut_free Q}.
 
 Lemma two_sided_to_one_sided_trans {Σ Γ} (P: Σ ⊢ Γ):
-  exists Q: ⊢O (list_neg Σ) ++ Γ, validity P = Ovalidity Q /\
-    cut_free P = Ocut_free Q.
+  {Q: ⊢O (list_neg Σ) ++ Γ | validity P = Ovalidity Q /\
+    cut_free P = Ocut_free Q}.
 Proof.
   induction_prv P Γ Γ' Δ Δ' A B IH1 P1 IH2 P2 IH P' => /=;
-    try destruct IH1 as [Q1 [HQ1val HQ1cut]]; 
+    try destruct IH1 as [Q1 [HQ1val HQ1cut]];
     try destruct IH2 as [Q2 [HQ2val HQ2cut]];
     try destruct IH as [Q [HQval HQcut]];
     rewrite ?HQ1val ?HQ2val ?HQ1cut ?HQ2cut ?HQval ?HQcut;
     try clear HQ1val HQ1cut HQ2val HQ2cut;
     try clear HQval HQcut.
-  - (* AX *) 
+  - (* AX *)
     exists (OAX _) => /=. by split.
   - (* EMP *)
     exists OEMP => /=. by split.
@@ -198,17 +232,25 @@ Proof.
     exists (OEFQ _) => /=. by split.
   - (* CUT *)
     simpl in Q2. rewrite list_neg_catD.
-    suff [Q [-> ->]]: exists Q: ⊢O (list_neg Γ ++ list_neg Γ') ++ Δ' ++ Δ ++ [],
-      (Ovalidity Q1 ⊗ Ovalidity Q2)%NNGE = Ovalidity Q /\ False = Ocut_free Q.
-      by rewrite -(cats0 ((_ ++ _) ++ _ ++ _)) -!(catA _ _ []);
-      destruct (Olist_list_exch Q) as [Q' [-> HQ']]; exists Q'.
-    rewrite cats0 catA -(catA _ _ Δ') -catA. exists (OCUT _ _ _ _ Q2 Q1) => //=. 
-    by rewrite mulnngeC.
+    (* The validity equation commutes a ⊗, so its proof does not reduce to
+       erefl; it must only be used inside the Prop component (after the
+       exists), lest it block the reduction of the extracted witness *)
+    enough ({Q: ⊢O (list_neg Γ ++ list_neg Γ') ++ Δ' ++ Δ ++ [] |
+      (Ovalidity Q1 ⊗ Ovalidity Q2)%NNGE = Ovalidity Q /\ False = Ocut_free Q})
+      as [Q [HQval HQcut]].
+      rewrite -(cats0 ((_ ++ _) ++ _ ++ _)) -!(catA _ _ []).
+      destruct (Olist_list_exch Q) as [Q' [HQ'val HQ'cut]]. exists Q'.
+      (* split before rewriting: the conj constructor must stay exposed, or
+         destructing this Prop component in a Type goal cannot reduce *)
+      split; first by rewrite HQval HQ'val.
+      by rewrite HQcut HQ'cut.
+    rewrite cats0 catA -(catA _ _ Δ') -catA. exists (OCUT _ _ _ _ Q2 Q1).
+    split => //=. by rewrite mulnngeC.
   - (* MIX *)
     rewrite list_neg_catD -catA.
-    suff [Q [-> ->]]: exists Q: ⊢O list_neg Γ ++ Δ ++ list_neg Γ' ++ Δ',
+    enough ({Q: ⊢O list_neg Γ ++ Δ ++ list_neg Γ' ++ Δ' |
       (Ovalidity Q1 ⊗ Ovalidity Q2)%NNGE = Ovalidity Q /\
-      (Ocut_free Q1 /\ Ocut_free Q2) = Ocut_free Q.
+      (Ocut_free Q1 /\ Ocut_free Q2) = Ocut_free Q}) as [Q [-> ->]].
       by destruct (Olist_list_exch Q) as [Q' [-> ->]];
       exists Q'; split => //=.
     rewrite catA. by exists (OMIX _ _ Q1 Q2).
@@ -217,23 +259,25 @@ Proof.
   - (* tensor_R *)
     move: (@Olist_form_exch_r _ [] _ _ Q1) => [Q1' [-> ->]].
     move: (@Olist_form_exch_r _ [] _ _ Q2) => [Q2' [-> ->]].
-    suff [Q [-> ->]]: exists Q : ⊢O A ⊗ B :: (list_neg Γ ++ list_neg Γ') ++ Δ ++ Δ',
+    enough ({Q : ⊢O A ⊗ B :: (list_neg Γ ++ list_neg Γ') ++ Δ ++ Δ' |
       (Ovalidity Q1' ⊗ Ovalidity Q2')%NNGE = Ovalidity Q /\
-      (Ocut_free Q1' /\ Ocut_free Q2') = Ocut_free Q.
+      (Ocut_free Q1' /\ Ocut_free Q2') = Ocut_free Q}) as [Q [-> ->]].
       by rewrite list_neg_catD; move: (@Olist_form_exch_l _ [] _ _ Q) => [Q' [-> ->]];
       exists Q'.
     rewrite -catA cat_cons_comm.
     pose Q := (Otensor _ _ _ _ Q1' Q2').
-    have ->: (Ovalidity Q1' ⊗ Ovalidity Q2')%NNGE = Ovalidity Q by done.
-    have ->: (Ocut_free Q1' /\ Ocut_free Q2') = Ocut_free Q by done.
+    assert (Hval: (Ovalidity Q1' ⊗ Ovalidity Q2')%NNGE = Ovalidity Q) by done.
+    assert (Hcut: (Ocut_free Q1' /\ Ocut_free Q2') = Ocut_free Q) by done.
+    rewrite {}Hval {}Hcut.
     move: Q. rewrite -catA cat_cons_comm => Q.
     move: (@Olist_list_exch _ _ _ _ Q) => [Q' [-> ->]].
     by exists Q'.
   - (* par_L *)
     rewrite list_neg_catD. simpl in Q1, Q2.
     pose Q := (Otensor _ _ _ _ Q1 Q2).
-    have ->: (Ovalidity Q1 ⊗ Ovalidity Q2)%NNGE = Ovalidity Q by done.
-    have ->: (Ocut_free Q1 /\ Ocut_free Q2) = Ocut_free Q by done.
+    assert (Hval: (Ovalidity Q1 ⊗ Ovalidity Q2)%NNGE = Ovalidity Q) by done.
+    assert (Hcut: (Ocut_free Q1 /\ Ocut_free Q2) = Ocut_free Q) by done.
+    rewrite {}Hval {}Hcut.
     move: Q. rewrite -!catA !cat_cons_comm => Q.
     move: (@Olist_list_exch _ _ _ _ Q) => [Q' [-> ->]].
     by exists Q'.
@@ -279,13 +323,19 @@ Proof.
   - (* EXCH_R *)
     move: Q. rewrite !(catA (list_neg Γ) Δ) => Q.
     by exists (OEXCH _ _ _ _ Q).
-Qed.
+  - (* AXM: translate to the corresponding one-sided axiom; the one-sided
+       record is built from the components of ax, so validity and index
+       agree definitionally, and the membership proof is Prop payload *)
+    exists (OAXM (mkOAxiom (ax_bound A) (list_neg (ax_lhs A) ++ ax_rhs A)%SEQ)
+              (ax_compat A P1)) => /=.
+    by split.
+Defined.
 
 Lemma one_sided_to_two_sided_trans {Σ: list (@qll_formula R p atoms)} (P: ⊢O Σ):
-  exists Q: [] ⊢ Σ, Ovalidity P = validity Q /\ (Ocut_free P = cut_free Q).
+  {Q: [] ⊢ Σ | Ovalidity P = validity Q /\ (Ocut_free P = cut_free Q)}.
 Proof.
   induction_Oprv P Σ Γ Δ A B P1 IH1 P2 IH2 P IH => /=;
-    try destruct IH1 as [Q1 [HQ1val HQ1cut]]; 
+    try destruct IH1 as [Q1 [HQ1val HQ1cut]];
     try destruct IH2 as [Q2 [HQ2val HQ2cut]];
     try destruct IH as [Q [HQval HQcut]];
     rewrite ?HQ1val ?HQ2val ?HQ1cut ?HQ2cut ?HQval ?HQcut;
@@ -305,10 +355,10 @@ Proof.
     pose Q := CUT _ _ _ _ _ Q2' Q1.
     have ->: False = cut_free Q by done.
     have ->: (validity Q1 ⊗ validity Q2')%NNGE = validity Q by rewrite mulnngeC.
-    move: Q. have ->: ((Σ ++ Δ) ++ Γ = Σ ++ Δ ++ Γ ++ [])%SEQ. 
+    move: Q. have ->: ((Σ ++ Δ) ++ Γ = Σ ++ Δ ++ Γ ++ [])%SEQ.
       by rewrite cats0 -catA.
     move=> /= Q. move: (list_list_exch_r Q) => [Q' [-> ->]].
-    move: Q'. rewrite cats0 => Q'. by exists Q'. 
+    move: Q'. rewrite cats0 => Q'. by exists Q'.
   - (* OMIX *)
     by exists (MIX _ _ _ _ Q1 Q2).
   - (* OEXCH *)
@@ -325,25 +375,29 @@ Proof.
     by exists (and_R _ _ _ _ Q1 Q2).
   - (* Otop *)
     by exists (top_R _ _).
-Qed.
+  - (* OAXM: the hypothesis provides the two-sided derivation, with the
+       matching validity and cut-freeness equations *)
+    exact: (Oax_deriv A P1).
+Defined.
 
 Lemma list_neg_push {Σ Γ Δ} (P: Δ ⊢ list_neg Σ ++ Γ):
-  exists Q: Σ ++ Δ ⊢ Γ, validity P = validity Q /\ cut_free P = cut_free Q.
+  {Q: Σ ++ Δ ⊢ Γ | validity P = validity Q /\ cut_free P = cut_free Q}.
 Proof.
   move: P. induction Σ as [|A Σ IHΣ] in Γ |-*; simpl; move=> P.
   - by exists P.
   - move: (@list_form_exch_rl _ _ [] _ _ P) => /= [Q [-> ->]].
     move: (IHΣ _ Q) => [Q' [-> ->]].
-    have ->: (A :: Σ ++ Δ =  A `* `* :: Σ ++ Δ)%SEQ by rewrite -neg_involutive.
+    assert (Hn: (A :: Σ ++ Δ =  A `* `* :: Σ ++ Δ)%SEQ). by rewrite -neg_involutive.
+    rewrite Hn.
     by exists (neg_L _ _ _ Q').
-Qed.
+Defined.
 
 Corollary one_sided_to_two_sided_list_neg_trans {Σ Γ} (P: ⊢O list_neg Σ ++ Γ):
-  exists Q: Σ ⊢ Γ, Ovalidity P = validity Q /\ Ocut_free P = cut_free Q.
+  {Q: Σ ⊢ Γ | Ovalidity P = validity Q /\ Ocut_free P = cut_free Q}.
 Proof.
   move: (one_sided_to_two_sided_trans P) => [Q [-> ->]].
   move: (list_neg_push Q). by rewrite cats0.
-Qed.
+Defined.
 
 (* Two sided provability and one sided provabilities coincide.
     TODO Prove this. Should follow from the results above *)
@@ -400,7 +454,7 @@ Lemma mulye_eval_form {p} (f: @qll_formula _ p _) q:
   (0 <= q)%R  -> (ratr q)%:E = (〚 f 〛_ atom_func)%:num
     -> (+oo * (〚 f 〛_ atom_func)%:num = +oo) \/
      (exists p : rat, (0 <= p)%R /\
-     (ratr p)%:E = +oo * (〚 f 〛_ atom_func)%:num). 
+     (ratr p)%:E = +oo * (〚 f 〛_ atom_func)%:num).
 Proof.
   move => Hq <-. destruct ((0: \bar R) < (ratr q)%:E) eqn:E.
   - left. by rewrite gt0_mulye.
@@ -443,7 +497,7 @@ Qed.
    in MathComp-analysis using the "+"-notation instead of adde, and somehow if
    the goal contains is adde a b, one cannot use addeC to rewrite to adde b a.
    We use adde instead of "+" as interval inference does not work property
-   with "+", only with adde *) 
+   with "+", only with adde *)
 Lemma adde_hack (a b: \bar R):
   adde a b = a + b.
 Proof. by []. Qed.
@@ -486,8 +540,8 @@ Proof.
       exists 0%:R. split=> //. rewrite -Hp'.
       destruct ((ratr p)%:E == (0%R: \bar R)) eqn:E'.
       + have ->: ((ratr p)%:E = (0%R: \bar R)) by apply/eqP.
-        by rewrite inve0 gt0_muley // invey ratr_nat.     
-      + have Hp0: ((ratr p)%:E != (0%R: \bar R)) by rewrite E'. 
+        by rewrite inve0 gt0_muley // invey ratr_nat.
+      + have Hp0: ((ratr p)%:E != (0%R: \bar R)) by rewrite E'.
         rewrite gt0_muley; first by rewrite invey ratr_nat.
         rewrite inve_gt0 //. apply lte_tofin. rewrite lt0r.
         apply/andP. split=> //. by rewrite ler0q.
@@ -507,8 +561,8 @@ Proof.
             apply ge0_neq0_gt0r => //; rewrite ler0q.
   - left. rewrite harmonic_p_sum_1 /= IHf1 IHf2.
     rewrite invey adde_hack.
-    by rewrite adde0 inve0. 
-  - rewrite harmonic_p_sum_1 /= IHf1. 
+    by rewrite adde0 inve0.
+  - rewrite harmonic_p_sum_1 /= IHf1.
     by apply (addye_eval_form _ q).
   - rewrite  harmonic_p_sum_1 /= IHf2 addeC_hack.
     by apply (addye_eval_form _ p).
@@ -548,15 +602,15 @@ Proof.
   - exists (tensor_R _ _ _ _ _ _ P1 P2) => /=.
     by apply (@lee_pmul _ _ _ _ (validity P2)%:nngnum). (* Just applying lee_pmus causes Rocq to diverge or take ages *)
   - pose P := (par_R _ _ _ _ (MIX _ _ _ _ P1 P2)). admit.
- (*   exists P => /=. Check lee_pV2. rewrite lee_pV2; try by rewrite /in_mem /=. 
+ (*   exists P => /=. Check lee_pV2. rewrite lee_pV2; try by rewrite /in_mem /=.
      by apply (@lee_pmul _ _ _ (validity P2)%:num^-1 _) => //;
        rewrite lee_pV2 //; rewrite /in_mem /=.
-  - exists (and_R f1 f2 [] [] P1 P2) => /=. 
+  - exists (and_R f1 f2 [] [] P1 P2) => /=.
     rewrite !harmonic_p_sum_1 /=.
-    rewrite lee_pV2; try by rewrite /in_mem /=. 
+    rewrite lee_pV2; try by rewrite /in_mem /=.
     by apply (@leeD _ (validity P1)%:num^-1 _ _ _); (* Same, just applying diverges *)
-      rewrite lee_pV2; try rewrite /in_mem /=. 
-  - exists (or_R f1 f2 [] [] P1 P2) => /=. 
+      rewrite lee_pV2; try rewrite /in_mem /=.
+  - exists (or_R f1 f2 [] [] P1 P2) => /=.
     rewrite !p_sum_1 /=.
     by apply (@leeD _ _ _ _ (validity P2)%:num). *)
 Admitted.

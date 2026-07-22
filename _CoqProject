@@ -5,5 +5,7 @@ theories/nonneg_ereal.v
 theories/list_lemmas.v
 theories/qll_defs.v
 theories/qll_core_facts.v
+theories/qll_rat_validity.v
 theories/qll_cut_elim.v
+theories/qll_theories.v
 

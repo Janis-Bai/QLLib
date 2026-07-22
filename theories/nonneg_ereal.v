@@ -1149,8 +1149,27 @@ Proof.
   by rewrite !invnnge_involutive.
 Qed.
  
+(** The product of a nonnegative extended real with its inverse is at
+    most 1: it is 1 for finite positive values, and 0 at 0 and +oo by
+    the 0 * +oo = 0 convention *)
+Lemma mule_inve_le1 (x: \bar R): 0 <= x -> (x^-1 * x <= 1%:E)%O.
+Proof.
+  case: x => [r| |] Hr //.
+  - rewrite inver. case Er: (r == 0%R).
+    + move/eqP: Er => ->. rewrite mule0 lee_fin. exact: ler01.
+    + move/negbT: Er => Er. by rewrite -EFinM mulVf //.
+  - rewrite invey mul0e lee_fin. exact: ler01.
+Qed.
+
+Lemma mul_invnnge_le1 (a: {nonneg \bar R}):
+  (((a `*) ⊗ a)%:num <= 1%:E)%O.
+Proof.
+  apply: mule_inve_le1.
+  by move: (nng_0pos a) => [->|/ltW].
+Qed.
+
 Lemma mul_p_sum_le_max_mul (a b c d: {nonneg \bar R}) (p: \bar R):
-  p != 0 -> ((a ⊕[p] b) ⊗ (c ⊕[-p] d) <= maxe (a ⊗ c) (b ⊗ d))%O. 
+  p != 0 -> ((a ⊕[p] b) ⊗ (c ⊕[-p] d) <= maxe (a ⊗ c) (b ⊗ d))%O.
 Proof.
 Admitted.
 End results.
