@@ -10,6 +10,11 @@ From Stdlib Require Import List.
 
 Import ListNotations.
 
+(* Stdlib's List.seq (the nat range function) shadows mathcomp's
+   abbreviation seq := list when List is imported after mathcomp;
+   restore the mathcomp convention *)
+Notation seq := list.
+
 Declare Scope qll_calculus.
 Delimit Scope qll_calculus with QLLC.
 
@@ -81,12 +86,52 @@ End negation.
 Notation "A `*" := (neg A): qll_calculus.
 Notation "A --o B" := (@bin _ _ _ par (neg A) B) (at level 45, right associativity, only parsing): qll_calculus.
 
+(** ** Axioms and Theories **)
+Section theories_def.
+
+Context {R: realType}.
+Context {p: {posnum \bar R}}.
+Context {atoms: Type}.
+
+(** An axiom r ≤ Γ ⊢ Δ postulates that the sequent Γ ⊢ Δ is derivable with
+    validity at least r. Since formulas are parameterised by the type of
+    their atoms, axioms over atoms mention at most the propositional
+    constants in atoms by construction. *)
+Record qll_axiom: Type := mkAxiom {
+  ax_bound: {nonneg \bar R};
+  ax_lhs: list (@qll_formula R p atoms);
+  ax_rhs: list (@qll_formula R p atoms)
+}.
+
+(** A pQLL theory is a set of axioms *)
+Definition qll_theory := set qll_axiom.
+
+(** One-sided axioms and theories: an axiom r ≤ ⊢O Γ postulates that the
+    one-sided sequent ⊢O Γ is derivable with validity at least r. The
+    one-sided form of a two-sided axiom r ≤ Γ ⊢ Δ has sequent Γ`* ++ Δ. *)
+Record Oqll_axiom: Type := mkOAxiom {
+  Oax_bound: {nonneg \bar R};
+  Oax_seq: list (@qll_formula R p atoms)
+}.
+
+Definition Oqll_theory := set Oqll_axiom.
+
+End theories_def.
+
+Notation "r ≤ Γ ⊢ Δ" := (mkAxiom r Γ Δ)
+  (at level 70, Γ at level 60, Δ at level 60): qll_calculus.
+
 (** ** Deduction Rules **)
+(** The deduction rules are parameterised by a theory T: besides the
+    logical rules, any axiom of T may be used as a leaf, with the
+    validity postulated by the axiom *)
 Section deduction.
 
 Context {R: realType}.
-Context {p: {posnum \bar R}}.  
+Context {p: {posnum \bar R}}.
 Context {atoms: Type}.
+Context {T: @qll_theory R p atoms}.
+Context {OT: @Oqll_theory R p atoms}.
 
 Local Open Scope ring_scope.
 Local Open Scope classical_set_scope.
@@ -178,10 +223,14 @@ Inductive prv : list (@qll_formula R p atoms) -> list (@qll_formula R p atoms) -
                              Γ ++ (A::B::Γ') ⊢ Δ
                          (* --------------------- *)
                        ->    Γ ++ (B::A::Γ') ⊢ Δ
-| EXCH_R A B Γ Δ Δ': 
+| EXCH_R A B Γ Δ Δ':
                              Γ ⊢ (Δ ++ A::B::Δ')
                          (* --------------------- *)
                        ->    Γ ⊢ (Δ ++ B::A::Δ')
+(* Axioms of the theory T *)
+| AXM ax:                          T ax
+                         (* --------------------- *)
+                       ->    ax_lhs ax ⊢ ax_rhs ax
 where "A ⊢ B" := (prv A B): qll_calculus.
 
 (** ** Validity and Provability of Sequents **)
@@ -208,6 +257,7 @@ Fixpoint validity {Γ} {Δ} (P: Γ ⊢ Δ): {nonneg \bar R} :=
   | top_R _ _ => +oo%:nng
   | EXCH_L _ _ _ _ _ P => validity P
   | EXCH_R _ _ _ _ _ P => validity P
+  | AXM ax _ => ax_bound ax
   end.
 
 Definition provability_set A B := (Itv.r \o validity) @` [set: A ⊢ B].
@@ -239,6 +289,7 @@ Fixpoint cut_free {Γ} {Δ} (P: Γ ⊢ Δ) := match P with
   | top_R _ _ => True
   | EXCH_L _ _ _ _ _ P => cut_free P
   | EXCH_R _ _ _ _ _ P => cut_free P
+  | AXM _ _ => True
   end.
 
 Reserved Notation "⊢O A" (at level 61). (* One sided variant of the calculus *)
@@ -286,6 +337,10 @@ Inductive Oprv : list (@qll_formula R p atoms) -> Type :=
 
 | Otop Γ:                    (* --------------------- *)
                                        ⊢O ⊤::Γ
+(* Axioms of the one-sided theory OT *)
+| OAXM ax:                            OT ax
+                             (* ---------------------- *)
+                          ->        ⊢O Oax_seq ax
 where "⊢O A" := (Oprv A): qll_calculus.
 
 Fixpoint Ovalidity {Γ} (P: ⊢O Γ): {nonneg \bar R} :=
@@ -302,6 +357,7 @@ Fixpoint Ovalidity {Γ} (P: ⊢O Γ): {nonneg \bar R} :=
   | Oor _ _ _ P1 P2 => Ovalidity P1 ⊕[p%:num] Ovalidity P2
   | Oand _ _ _ P1 P2 => Ovalidity P1 ⊕[-p%:num] Ovalidity P2
   | Otop _ => +oo%:nng
+  | OAXM ax _ => Oax_bound ax
   end.
 
 Definition Oprovability_set Γ := (Itv.r \o Ovalidity) @` [set: ⊢O Γ].
@@ -322,14 +378,18 @@ Fixpoint Ocut_free {Γ} (P: ⊢O Γ) := match P with
   | Oor _ _ _ P1 P2 => Ocut_free P1 /\ Ocut_free P2
   | Oand _ _ _ P1 P2 => Ocut_free P1 /\ Ocut_free P2
   | Otop _ => True
+  | OAXM _ _ => True
 end.
 
 End deduction.
 
-Notation "A ⊢ B" := (@prv _ _ _ A B) (at level 61): qll_calculus. 
-Notation "|/ A ⊢- B |/" := (@provability _ _ _ A B) (at level 61): qll_calculus. (* TODOFind better notation  *)
-Notation "⊢O Γ" := (@Oprv _ _ _ Γ) (at level 61): qll_calculus.
-Notation "`| ⊢O Γ |" := (@Oprovability _ _ _ Γ): qll_calculus. 
+(* Derivability in a theory T; the plain ⊢ notation defaults to the empty theory *)
+Notation "A ⊢[ T ] B" := (@prv _ _ _ T A B) (at level 61): qll_calculus.
+Notation "A ⊢ B" := (@prv _ _ _ set0 A B) (at level 61): qll_calculus.
+Notation "|/ A ⊢- B |/" := (@provability _ _ _ set0 A B) (at level 61): qll_calculus. (* TODOFind better notation  *)
+Notation "⊢O[ OT ] Γ" := (@Oprv _ _ _ OT Γ) (at level 61): qll_calculus.
+Notation "⊢O Γ" := (@Oprv _ _ _ set0 Γ) (at level 61): qll_calculus.
+Notation "`| ⊢O Γ |" := (@Oprovability _ _ _ set0 Γ): qll_calculus.
 
 Ltac induction_prv H Γ Γ' Δ Δ' A B IH1 P1 IH2 P2 IH P :=
   match type of H with
@@ -353,7 +413,8 @@ Ltac induction_prv H Γ Γ' Δ Δ' A B IH1 P1 IH2 P2 IH P :=
                             | Γ Δ
                             | Γ Δ
                             | A B Γ Γ' Δ P IH
-                            | A B Γ Δ Δ' P IH ]
+                            | A B Γ Δ Δ' P IH
+                            | A P1 ]
   end.
 
 (* Tactic to conveniently destruct Oprv deductions, inspired by Laurent's LL proof. *) 
@@ -367,10 +428,11 @@ Ltac destruct_Oprv H Σ Γ Δ A B P1 P2 P :=
                             | A B Γ Δ P
                             | A B Γ Δ P1 P2
                             | A B Γ P
-                            | 
+                            |
                             | A B Γ P1 P2
                             | A B Γ P1 P2
-                            | Γ ]
+                            | Γ
+                            | A P1 ]
   end.
 
 Ltac induction_Oprv H Σ Γ Δ A B P1 IH1 P2 IH2 P IH :=
@@ -383,10 +445,11 @@ Ltac induction_Oprv H Σ Γ Δ A B P1 IH1 P2 IH2 P IH :=
                             | A B Γ Δ P IH
                             | A B Γ Δ P1 IH1 P2 IH2
                             | A B Γ P IH
-                            | 
+                            |
                             | A B Γ P1 IH1 P2 IH2
                             | A B Γ P1 IH1 P2 IH2
-                            | Γ ]
+                            | Γ
+                            | A P1 ]
   end.
 
 (** ** Semantics: Interpretation of Formulas **)
